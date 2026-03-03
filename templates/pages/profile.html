@@ -16,16 +16,16 @@
             <div class="profile-avatar">
                 {{if eq .AuthType "scratch"}}
                 {{if .ProfileUser.avatar}}
-                <img src="{{.ProfileUser.avatar}}" alt="{{.User.username}}">
+                <img src="{{.ProfileUser.avatar}}" alt="{{.ProfileUser.username}}">
                 {{else}}
-                <img src="{{getScratchUserAvatarURL .User.username}}" alt="{{.User.username}}">
+                <img src="{{getScratchUserAvatarURL .ProfileUser.username}}" alt="{{.ProfileUser.username}}">
                 {{end}}
                 {{else if eq .AuthType "rotur"}}
-                <img src="https://avatars.rotur.dev/{{.User.username}}" alt="{{.User.username}}">
+                <img src="https://avatars.rotur.dev/{{.ProfileUser.username}}" alt="{{.ProfileUser.username}}">
                 {{end}}
             </div>
             <div class="profile-info">
-                <h1 class="profile-name">{{formatUsername .User.username .AuthType}}</h1>
+                <h1 class="profile-name">{{formatUsername .ProfileUser.username .AuthType}}</h1>
                 <p class="profile-meta">
                     <span><i data-lucide="palette"></i> {{len .Themes}} theme(s)</span>
                     <span><i data-lucide="calendar"></i> {{formatDate .ProfileUser.createdAt}}</span>
