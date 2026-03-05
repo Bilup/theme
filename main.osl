@@ -38,7 +38,6 @@ import "github.com/gin-gonic/gin"
 mainloop:
 
     ensureDirectories()
-    migrateData()
     rebuildIndexWithAccents()
 
     auto r = gin.Default()

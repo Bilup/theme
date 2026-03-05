@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    const ratingBtns = document.querySelectorAll('.rating-btn');
+    const ratingBtns = document.querySelectorAll('.rating-btn:not(.disabled)');
     ratingBtns.forEach(btn => {
         btn.addEventListener('click', async function() {
             const rating = this.dataset.rating;
@@ -74,7 +74,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         dislikesBtn.textContent = formatNumber(result.dislikes || 0);
                     }
                 } else {
-                    alert('Failed to rate theme: ' + (result.error || 'unknown error'));
+                    if (result.error && result.error.includes('must be logged in')) {
+                        if (confirm('You need to log in to like/dislike themes. Redirect to login page?')) {
+                            window.location.href = '/auth';
+                        }
+                    } else {
+                        alert('Failed to rate theme: ' + (result.error || 'unknown error'));
+                    }
                 }
             } catch (error) {
                 console.error('Rating error:', error);

@@ -7,162 +7,6 @@ def ensureDirectories() boolean (
     return result
 )
 
-def migrateUsers() boolean (
-    string oldFile = "data/users.json"
-    if !fs.Exists(oldFile) (
-        return true
-    )
-    
-    auto result = readFile(oldFile)
-    if !result.ok (
-        return false
-    )
-    
-    object usersData = result.data.assert(object)
-    object users = usersData.users
-    
-    array userIds = users.getKeys().toArray()
-    
-    for i userIds.len (
-        string userId = userIds[i].toStr()
-        object user = users[userId]
-        
-        string path = usersDir ++ userId ++ ".json"
-        if !fs.Exists(path) (
-            writeFile(path, user)
-        )
-    )
-    
-    string backupPath = oldFile ++ ".backup"
-    fs.Rename(oldFile, backupPath)
-    
-    return true
-)
-
-def migrateSessions() boolean (
-    string oldFile = "data/sessions.json"
-    if !fs.Exists(oldFile) (
-        return true
-    )
-    
-    auto result = readFile(oldFile)
-    if !result.ok (
-        return false
-    )
-    
-    object sessionsData = result.data.assert(object)
-    object sessions = sessionsData.sessions
-    
-    array sessionIds = sessions.getKeys().toArray()
-    
-    for i sessionIds.len (
-        string sessionId = sessionIds[i].toStr()
-        object session = sessions[sessionId]
-        
-        string path = sessionsDir ++ sessionId ++ ".json"
-        if !fs.Exists(path) (
-            writeFile(path, session)
-        )
-    )
-    
-    string backupPath = oldFile ++ ".backup"
-    fs.Rename(oldFile, backupPath)
-    
-    return true
-)
-
-def migrateRatings() boolean (
-    string oldFile = "data/ratings.json"
-    if !fs.Exists(oldFile) (
-        return true
-    )
-    
-    auto result = readFile(oldFile)
-    if !result.ok (
-        return false
-    )
-    
-    object ratingsData = result.data.assert(object)
-    object ratings = ratingsData.ratings
-    
-    array themeUUIDs = ratings.getKeys().toArray()
-    
-    for i themeUUIDs.len (
-        string uuid = themeUUIDs[i].toStr()
-        object rating = ratings[uuid]
-        
-        string path = ratingsDir ++ uuid ++ ".json"
-        if !fs.Exists(path) (
-            writeFile(path, rating)
-        )
-    )
-    
-    string backupPath = oldFile ++ ".backup"
-    fs.Rename(oldFile, backupPath)
-    
-    return true
-)
-
-def migrateDownloads() boolean (
-    string oldFile = "data/downloads.json"
-    if !fs.Exists(oldFile) (
-        return true
-    )
-    
-    auto result = readFile(oldFile)
-    if !result.ok (
-        return false
-    )
-    
-    object downloadsData = result.data.assert(object)
-    object downloads = downloadsData.downloads
-    
-    array themeUUIDs = downloads.getKeys().toArray()
-    
-    for i themeUUIDs.len (
-        string uuid = themeUUIDs[i].toStr()
-        object download = downloads[uuid]
-        
-        string path = downloadsDir ++ uuid ++ ".json"
-        if !fs.Exists(path) (
-            writeFile(path, download)
-        )
-    )
-    
-    string backupPath = oldFile ++ ".backup"
-    fs.Rename(oldFile, backupPath)
-    
-    return true
-)
-
-def migrateData() boolean (
-    if fs.Exists("data/users.json") (
-        if !migrateUsers() (
-            return false
-        )
-    )
-    
-    if fs.Exists("data/sessions.json") (
-        if !migrateSessions() (
-            return false
-        )
-    )
-    
-    if fs.Exists("data/ratings.json") (
-        if !migrateRatings() (
-            return false
-        )
-    )
-    
-    if fs.Exists("data/downloads.json") (
-        if !migrateDownloads() (
-            return false
-        )
-    )
-    
-    return true
-)
-
 def readFile(string path) any (
     if !fs.Exists(path) (
         return {ok: false, error: "file not found"}
@@ -492,6 +336,10 @@ def getRatings(string uuid) object (
 
 def rateTheme(string uuid, string userId, string rating) boolean (
     if rating != "like" and rating != "dislike" (
+        return false
+    )
+    
+    if userId == "" (
         return false
     )
 

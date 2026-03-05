@@ -599,6 +599,12 @@ def handleDeleteTheme(*gin.Context c) (
 
 def handleRateTheme(*gin.Context c) (
     string userId = c.MustGet("userId").toStr()
+    boolean authenticated = c.MustGet("authenticated").toBool()
+
+    if !authenticated (
+        c.JSON(401, {ok: false, error: "you must be logged in to like/dislike themes"})
+        return
+    )
 
     string uuid = c.PostForm("uuid")
     string rating = c.PostForm("rating")

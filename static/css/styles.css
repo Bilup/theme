@@ -1049,7 +1049,7 @@ body > .footer {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.theme-rating-actions .rating-btn:hover {
+.theme-rating-actions .rating-btn:hover:not(:disabled) {
     background: var(--primary-color);
     color: white;
     transform: translateY(-1px);
@@ -1062,6 +1062,22 @@ body > .footer {
 
 .theme-rating-actions .rating-btn.dislike.active {
     background: var(--danger-color);
+}
+
+.theme-rating-actions .rating-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.theme-rating-actions .rating-btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.theme-rating-actions .rating-btn.disabled:hover {
+    background: var(--card-bg);
+    color: var(--text-light);
+    transform: none;
 }
 
 .theme-rating-actions .rating-btn svg {

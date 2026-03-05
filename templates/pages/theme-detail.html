@@ -75,6 +75,7 @@
                     </div>
                     
                     <div class="theme-rating-actions">
+                        {{if .Authenticated}}
                         <button class="rating-btn like {{if eq .UserRating "like"}}active{{end}}" data-rating="like" title="Like this theme">
                             <i data-lucide="thumbs-up"></i>
                             <span>{{formatNumber .Ratings.likes}}</span>
@@ -83,6 +84,16 @@
                             <i data-lucide="thumbs-down"></i>
                             <span>{{formatNumber .Ratings.dislikes}}</span>
                         </button>
+                        {{else}}
+                        <button class="rating-btn like disabled" data-rating="like" title="Log in to like themes" disabled>
+                            <i data-lucide="thumbs-up"></i>
+                            <span>{{formatNumber .Ratings.likes}}</span>
+                        </button>
+                        <button class="rating-btn dislike disabled" data-rating="dislike" title="Log in to dislike themes" disabled>
+                            <i data-lucide="thumbs-down"></i>
+                            <span>{{formatNumber .Ratings.dislikes}}</span>
+                        </button>
+                        {{end}}
                     </div>
                     
                     <div class="theme-description">
