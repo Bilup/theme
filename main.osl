@@ -87,6 +87,7 @@ mainloop:
 	r.GET("/settings", settingsPage)
     
     auto api = r.Group("/api")
+    api.Use(noCORS)
     api.GET("/health", handleHealth)
     api.GET("/user", handleGetCurrentUser)
     api.GET("/auth", handleRoturAuth)

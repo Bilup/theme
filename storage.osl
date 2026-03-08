@@ -531,12 +531,22 @@ def listThemes(string sortBy) object (
                 desc = themeData.description.toStr()
             )
             
+            string authorId = themeData.author.toStr()
+            string authorType = themeData.authorType.toStr()
+            
+            string authorName = authorId
+            auto userResult = getUser(authorId, authorType)
+            if userResult.ok (
+                authorName = userResult.user.username.toStr()
+            )
+            
             themeList.append({
                 uuid: themeData.uuid,
                 name: themeData.name,
                 description: desc,
-                author: themeData.author,
-                authorType: themeData.authorType,
+                authorName: authorName,
+                author: authorId,
+                authorType: authorType,
                 platform: themeData.platform,
                 createdAt: indexEntry.createdAt,
                 colors: getThemeColors(themeData, indexEntry),
@@ -656,12 +666,24 @@ def getUserThemes(string identifier, string authType) object (
             number likes = ratings.likes.toNum()
             number dislikes = ratings.dislikes.toNum()
             
+            string authorId = themeData.author.toStr()
+            string authorType = themeData.authorType.toStr()
+            
+            string authorName = user.username.toStr()
+            if authorId != identifier or authorType != authType (
+                auto authorResult = getUser(authorId, authorType)
+                if authorResult.ok (
+                    authorName = authorResult.user.username.toStr()
+                )
+            )
+            
             themes.append({
                 uuid: themeData.uuid,
                 name: themeData.name,
                 description: themeData.description.toStr(),
-                author: themeData.author,
-                authorType: themeData.authorType,
+                authorName: authorName,
+                author: authorId,
+                authorType: authorType,
                 platform: themeData.platform,
                 createdAt: indexEntry.createdAt,
                 colors: getThemeColors(themeData, indexEntry),
