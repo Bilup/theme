@@ -1,6 +1,5 @@
 def encodeBase64(string str) string (
-    auto result = raw("base64.StdEncoding.EncodeToString([]byte(str))")
-    return result.toStr()
+    return btoa(str)
 )
 
 def getCookie(*gin.Context c, string name) string (

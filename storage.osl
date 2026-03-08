@@ -733,55 +733,59 @@ def getDownloadCount(string uuid) number (
 )
 
 def getUserLikedThemes(string userId, string authType) object (
-    auto userResult = getUser(userId, authType)
-    if !userResult.ok (
-        return {ok: false, error: "user not found"}
+  auto userResult = getUser(userId, authType)
+  if !userResult.ok (
+    return {ok: false, error: "user not found"}
+  )
+
+  object user = userResult.user
+
+  object index = loadThemeIndex()
+  object indexThemes = index.themes
+  auto themes = []
+
+  array ratingFiles = fs.ReadDir(ratingsDir).toArray()
+  for i ratingFiles.len (
+    string filename = ratingFiles[i].toStr()
+    if !filename.endsWith(".json") (
+      continue
     )
-    
-    object user = userResult.user
-    
-    object index = loadThemeIndex()
-    object indexThemes = index.themes
-    auto themes = []
-    
-    array ratingFiles = fs.ReadDir(ratingsDir).toArray()
-    for i ratingFiles.len (
-        string filename = ratingFiles[i].toStr()
-        if !filename.endsWith(".json") (
-            continue
-        )
-        
-        string uuid = filename.trim(1, -5).toStr()
-        object themeRatings = getRatings(uuid)
-        object userRatings = themeRatings.userRatings
-        
-        if userRatings.contains(userId) and userRatings[userId].toStr() == "like" (
-            auto themeResult = loadThemeFile(uuid)
-            if themeResult.ok (
-                object themeData = themeResult.data
-                object indexEntry = indexThemes[uuid]
-                
-                number downloads = indexEntry.downloads.toNum()
-                number likes = themeRatings.likes.toNum()
-                number dislikes = themeRatings.dislikes.toNum()
-                
-                themes.append({
-                    uuid: themeData.uuid,
-                    name: themeData.name,
-                    description: themeData.description.toStr(),
-                    author: themeData.author,
-                    authorType: themeData.authorType,
-                    platform: themeData.platform,
-                    createdAt: indexEntry.createdAt,
-                    colors: getThemeColors(themeData, indexEntry),
-                    likes: likes,
-                    dislikes: dislikes,
-                    downloads: downloads
-                })
-            )
-        )
+
+    string uuid = filename.trim(1, -5).toStr()
+    object themeRatings = getRatings(uuid)
+    object userRatings = themeRatings.userRatings
+
+    if userRatings.contains(userId) and userRatings[userId].toStr() == "like" (
+      if !indexThemes.contains(uuid) (
+        continue
+      )
+
+      auto themeResult = loadThemeFile(uuid)
+      if themeResult.ok (
+        object themeData = themeResult.data
+        object indexEntry = indexThemes[uuid]
+
+        number downloads = indexEntry.downloads.toNum()
+        number likes = themeRatings.likes.toNum()
+        number dislikes = themeRatings.dislikes.toNum()
+
+        themes.append({
+          uuid: themeData.uuid,
+          name: themeData.name,
+          description: themeData.description.toStr(),
+          author: themeData.author,
+          authorType: themeData.authorType,
+          platform: themeData.platform,
+          createdAt: indexEntry.createdAt,
+          colors: getThemeColors(themeData, indexEntry),
+          likes: likes,
+          dislikes: dislikes,
+          downloads: downloads
+        })
+      )
     )
-    
-    themes.sortBy("createdAt", true)
-    return {ok: true, themes: themes, user: user}
+  )
+
+  themes.sortBy("createdAt", true)
+  return {ok: true, themes: themes, user: user}
 )

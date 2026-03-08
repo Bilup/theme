@@ -1,7 +1,6 @@
 import "osl/fs"
 import "osl/requests"
 
-import "encoding/base64"
 import "encoding/json"
 import "html/template"
 import "net/http"
