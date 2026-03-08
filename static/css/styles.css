@@ -66,17 +66,17 @@ body {
     flex-direction: column;
 }
 
-body > nav {
+body>nav {
     flex-shrink: 0;
 }
 
-body > main {
+body>main {
     flex: 1;
     display: flex;
     flex-direction: column;
 }
 
-body > .footer {
+body>.footer {
     flex-shrink: 0;
 }
 
@@ -114,7 +114,8 @@ body > .footer {
     align-items: center;
 }
 
-.nav-link, button#logout-btn {
+.nav-link,
+button#logout-btn {
     text-decoration: none;
     color: var(--text-color);
     font-weight: 500;
@@ -129,7 +130,8 @@ body > .footer {
     gap: 0.5rem;
 }
 
-.nav-link:hover, button#logout-btn:hover {
+.nav-link:hover,
+button#logout-btn:hover {
     color: var(--primary-color);
     border-bottom-color: var(--primary-color);
 }
@@ -420,12 +422,12 @@ body > .footer {
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
     opacity: 0.15;
     z-index: 0;
 }
 
-.theme-card-header > * {
+.theme-card-header>* {
     position: relative;
     z-index: 1;
 }
@@ -510,22 +512,24 @@ body > .footer {
     gap: 0.5rem;
 }
 
-.theme-card-actions a, .theme-card-actions button {
-  padding: 0.5rem;
-  border-radius: 50%;
-  background: var(--card-bg);
-  backdrop-filter: blur(4px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  cursor: pointer;
-  transition: var(--transition);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+.theme-card-actions a,
+.theme-card-actions button {
+    padding: 0.5rem;
+    border-radius: 50%;
+    background: var(--card-bg);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.theme-card-actions a:hover, .theme-card-actions button:hover {
+.theme-card-actions a:hover,
+.theme-card-actions button:hover {
     background: var(--primary-color);
     color: white;
 }
@@ -539,6 +543,18 @@ body > .footer {
     font-size: 1.25rem;
     margin-bottom: 0.5rem;
     color: var(--text-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.theme-name-link {
+    text-decoration: none;
+    color: inherit;
+}
+
+.theme-name-link:hover .theme-name {
+    color: var(--primary-color);
 }
 
 .theme-description {
@@ -572,6 +588,18 @@ body > .footer {
     gap: 0.5rem;
 }
 
+.author-link {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    color: inherit;
+}
+
+.author-link:hover .author-name {
+    color: var(--primary-color);
+}
+
 .author-avatar {
     width: 2rem;
     height: 2rem;
@@ -585,8 +613,13 @@ body > .footer {
 }
 
 .author-name {
-    font-weight: 500;
+    font-size: 1.5rem;
     color: var(--text-color);
+    font-weight: 500;
+}
+
+.theme-card-footer .author-name {
+    font-size: 1.2rem;
 }
 
 .theme-stats {
@@ -1179,12 +1212,6 @@ body > .footer {
     border-radius: 50%;
     object-fit: cover;
     border: 3px solid var(--primary-color);
-}
-
-.author-name {
-    font-size: 1.5rem;
-    margin-bottom: 0.5rem;
-    color: var(--text-color);
 }
 
 .view-profile-link {
@@ -1931,4 +1958,3 @@ body > .footer {
     color: var(--primary-color);
     flex-shrink: 0;
 }
-

@@ -10,6 +10,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
   setupDropdown();
 
+  sortThemes('newest');
+
   if (logoutBtn) {
     logoutBtn.addEventListener('click', async function() {
       try {
@@ -74,63 +76,63 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  function sortThemes(sortBy) {
-    const themesGrid = document.getElementById('themes-grid');
-    const cards = Array.from(document.querySelectorAll('.theme-card'));
-    
-    const visibleCards = cards.filter(card => card.style.display !== 'none');
-    
-    visibleCards.sort((a, b) => {
-      switch(sortBy) {
-        case 'likes':
-          const likesA = parseInt(a.querySelector('.stat span')?.textContent || '0');
-          const likesB = parseInt(b.querySelector('.stat span')?.textContent || '0');
-          return likesB - likesA;
-        case 'name':
-          const nameA = a.dataset.name.toLowerCase();
-          const nameB = b.dataset.name.toLowerCase();
-          return nameA.localeCompare(nameB);
-        case 'newest':
-        default:
-          return 0;
-      }
-    });
-    
-    visibleCards.forEach(card => {
-      themesGrid.appendChild(card);
-    });
-  }
+function sortThemes(sortBy) {
+  const themesGrid = document.getElementById('themes-grid');
+  const cards = Array.from(document.querySelectorAll('.theme-card'));
 
-  function themeHasColor(card, colorName) {
-    const header = card.querySelector('.theme-card-header');
-    if (!header) return false;
+  const visibleCards = cards.filter(card => card.style.display !== 'none');
 
-    const colorsData = header.dataset.colors || header.dataset.accent;
-    if (!colorsData) return false;
-
-    try {
-      let gradientColors = null;
-
-      if (header.dataset.colors) {
-        const data = JSON.parse(colorsData);
-        if (data && data.gradient && Array.isArray(data.gradient)) {
-          gradientColors = data.gradient;
-        }
-      } else if (header.dataset.accent) {
-        const data = JSON.parse(colorsData);
-        if (data && data.colors && Array.isArray(data.colors)) {
-          gradientColors = data.colors;
-        }
-      }
-
-      if (gradientColors) {
-        return gradientColors.some(c => colorMatchesCategory(c.color, colorName));
-      }
-    } catch (e) {
-      console.debug('Failed to parse gradient data:', e);
+  visibleCards.sort((a, b) => {
+    switch(sortBy) {
+      case 'likes':
+        const likesA = parseInt(a.querySelector('.stat span')?.textContent || '0');
+        const likesB = parseInt(b.querySelector('.stat span')?.textContent || '0');
+        return likesB - likesA;
+      case 'name':
+        const nameA = a.dataset.name.toLowerCase();
+        const nameB = b.dataset.name.toLowerCase();
+        return nameA.localeCompare(nameB);
+      case 'newest':
+      default:
+        const dateA = new Date(a.dataset.createdAt || 0).getTime();
+        const dateB = new Date(b.dataset.createdAt || 0).getTime();
+        return dateB - dateA;
     }
-    return false;
+  });
+
+  visibleCards.forEach(card => {
+    themesGrid.appendChild(card);
+  });
+}
+
+function themeHasColor(card, colorName) {
+  const header = card.querySelector('.theme-card-header');
+  if (!header) return false;
+
+  const colorsData = header.dataset.colors || header.dataset.accent;
+  if (!colorsData) return false;
+
+  try {
+    const data = JSON.parse(colorsData);
+    let gradientColors = null;
+
+    if (data.gradient && Array.isArray(data.gradient)) {
+      gradientColors = data.gradient;
+    } else if (data.colors && Array.isArray(data.colors)) {
+      gradientColors = data.colors;
+    }
+
+    if (gradientColors && gradientColors.length > 0) {
+      return gradientColors.some(c => {
+        const hex = typeof c === 'string' ? c : (c.color || '');
+        return hex && colorMatchesCategory(hex, colorName);
+      });
+    }
+  } catch (e) {
+    console.debug('Failed to parse gradient data:', e);
   }
+  return false;
+}
 
   function colorMatchesCategory(hexColor, category) {
     const rgb = hexToRgb(hexColor);

@@ -5,7 +5,7 @@
 {{$showActions := .ShowActions}}
 {{$showDate := .ShowDate}}
 {{$users := .Users}}
-<article class="theme-card" data-uuid="{{$theme.uuid}}" data-name="{{$theme.name}}" data-platform="{{$theme.platform}}">
+<article class="theme-card" data-uuid="{{$theme.uuid}}" data-name="{{$theme.name}}" data-platform="{{$theme.platform}}" data-created-at="{{$theme.createdAt}}">
     <div class="theme-card-header" style="{{if $theme.colors}}{{safeStyle (buildGradientFromColors $theme.colors)}}{{else if $theme.accent}}{{safeStyle (buildGradientFromAccent $theme.accent)}}{{end}}" {{if $theme.colors}}data-colors='{{ toJson $theme.colors }}'{{else if $theme.accent}}data-accent='{{ toJson $theme.accent }}'{{end}}>
         <div class="theme-card-header-left">
         </div>
@@ -23,28 +23,32 @@
             {{end}}
         </div>
     </div>
-    <div class="theme-card-body">
-        <h3 class="theme-name">{{$theme.name}}</h3>
-        <p class="theme-description truncate">{{if $theme.description}}{{$theme.description}}{{else}}&nbsp;{{end}}</p>
-    </div>
+<div class="theme-card-body">
+  <a href="/themes/{{$theme.author}}/{{slugify $theme.name}}" class="theme-name-link">
+    <h3 class="theme-name">{{$theme.name}}</h3>
+  </a>
+  <p class="theme-description truncate">{{if $theme.description}}{{$theme.description}}{{else}}&nbsp;{{end}}</p>
+</div>
     <div class="theme-card-footer">
         {{if $showAuthor}}
         {{if $users}}
         {{with index $users $theme.author}}
-        <div class="theme-author">
-            {{if eq .authType "scratch"}}
-                {{if .avatar}}
-                <img src="{{.avatar}}" alt="{{.username}}" class="author-avatar">
-                {{else}}
-                <img src="{{getScratchUserAvatarURL .username}}" alt="{{.username}}" class="author-avatar">
-                {{end}}
-            {{else if eq .authType "rotur"}}
-                <img src="https://avatars.rotur.dev/{{.username}}" alt="{{.username}}" class="author-avatar">
-            {{else}}
-                <div class="author-avatar avatar-placeholder">{{.username}}</div>
-            {{end}}
-            <span class="author-name">{{formatUsername .username .authType}}</span>
-        </div>
+<div class="theme-author">
+  <a href="/u/{{$theme.author}}" class="author-link">
+    {{if eq .authType "scratch"}}
+    {{if .avatar}}
+    <img src="{{.avatar}}" alt="{{.username}}" class="author-avatar">
+    {{else}}
+    <img src="{{getScratchUserAvatarURL .username}}" alt="{{.username}}" class="author-avatar">
+    {{end}}
+    {{else if eq .authType "rotur"}}
+    <img src="https://avatars.rotur.dev/{{.username}}" alt="{{.username}}" class="author-avatar">
+    {{else}}
+    <div class="author-avatar avatar-placeholder">{{.username}}</div>
+    {{end}}
+    <span class="author-name">{{formatUsername .username .authType}}</span>
+  </a>
+</div>
         {{end}}
         {{end}}
         {{end}}
