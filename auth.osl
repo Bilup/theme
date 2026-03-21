@@ -80,63 +80,6 @@ def parseAuthToken(string token) object (
     return getSession(token)
 )
 
-def verifyScratchToken(string privateCode, string expectedRedirect) object (
-    string url = scratchVerifyURL ++ "?privateCode=" ++ privateCode
-    object resp = requests.Get(url)
-
-    if !resp.success (
-        return {ok: false, error: "request failed"}
-    )
-
-    object data = resp.body.toStr().JsonParse().assert(object)
-
-    if !data.contains("valid") or data.valid == false (
-        return {ok: false, error: "invalid token"}
-    )
-
-    if data.contains("redirect") and data.redirect != expectedRedirect (
-        return {ok: false, error: "redirect mismatch"}
-    )
-
-    return {
-        ok: true,
-        username: data.username,
-        valid: true
-    }
-)
-
-def handleScratchAuthRedirect(*gin.Context c) (
-    string callbackURL = appURL ++ "/auth/scratch/callback"
-    string encoded = encodeBase64(callbackURL)
-    string redirect = scratchAuthURL ++ "?redirect=" ++ encoded ++ "&name=WarpTheme"
-    c.Redirect(302, redirect)
-)
-
-def getScratchUserId(string username) string (
-    string url = "https://scratch.mit.edu/users/" ++ username
-    object resp = requests.Get(url)
-
-    if !resp.success (
-        return ""
-    )
-
-    string html = resp.body.toStr()
-
-    array parts = html.split("/user/")
-    for i parts.len (
-        string part = parts[i].toStr()
-        int underscoreIdx = part.index("_")
-        if underscoreIdx > 0 (
-            string potentialId = part.trim(1, underscoreIdx - 1)
-            if potentialId.len > 0 and potentialId.toNum() > 0 (
-                return potentialId
-            )
-        )
-    )
-
-    return ""
-)
-
 def updateUserAvatar(string userId, string authType, string avatarUrl) boolean (
     auto userResult = getUser(userId, authType)
     if !userResult.ok (
@@ -149,77 +92,6 @@ def updateUserAvatar(string userId, string authType, string avatarUrl) boolean (
 
     string path = usersDir ++ userId ++ ".json"
     return writeFile(path, storedUser)
-)
-
-def handleScratchAuthCallback(*gin.Context c) (
-    string privateCode = c.Query("privateCode")
-    string expectedRedirect = appURL ++ "/auth/scratch/callback"
-
-    if privateCode == "" (
-        c.JSON(400, {ok: false, error: "missing private code"})
-        return
-    )
-
-    object result = verifyScratchToken(privateCode, expectedRedirect)
-    if !result.ok (
-        c.JSON(403, {ok: false, error: result.error})
-        return
-    )
-
-    string username = result.username.toStr()
-    string userId = "@" ++ username
-
-    ensureUser(userId, "scratch", userId)
-
-    string scratchUserId = getScratchUserId(username)
-    string avatarUrl = ""
-    if scratchUserId != "" (
-        avatarUrl = "https://uploads.scratch.mit.edu/users/avatars/" ++ scratchUserId ++ ".png"
-        updateUserAvatar(userId, "scratch", avatarUrl)
-    )
-
-    string sessionId = createSession(userId, "scratch")
-    setAuthCookie(c, sessionId, "scratch")
-    c.Redirect(302, "/")
-)
-
-def handleRoturAuth(*gin.Context c) (
-    string validator = c.Query("v")
-    
-    if validator == "" (
-        c.JSON(401, {ok: false, error: "missing token"})
-        return
-    )
-    
-    object resp = requests.Get("https://api.rotur.dev/validate?key=warptheme&v=" ++ validator)
-    
-    if !resp.success (
-        c.JSON(401, {ok: false, error: "failed to validate token"})
-        return
-    )
-    
-    object json = resp.body.toStr().JsonParse()
-    
-    if json.error != null (
-        c.JSON(401, {ok: false, error: json.error})
-        return
-    )
-    
-    if !json.valid (
-        c.JSON(401, {ok: false, error: "invalid token"})
-        return
-    )
-    
-    string userId = json.id.toStr()
-    string username = json.username.toStr()
-    
-    ensureUser(userId, "rotur", username)
-    
-    string sessionId = createSession(userId, "rotur")
-    
-    setAuthCookie(c, sessionId, "rotur")
-    
-    c.JSON(200, {ok: true, sessionId: sessionId, username: username})
 )
 
 def handleLogout(*gin.Context c) (
@@ -260,4 +132,116 @@ def getCurrentUser(*gin.Context c) object (
         authType: parsed.authType,
         userId: parsed.userId
     }
+)
+
+// Exchange code for access token
+def getGitHubAccessToken(string code, string codeVerifier) object (
+    if GITHUB_CLIENT_ID == "" or GITHUB_CLIENT_SECRET == "" (
+        return {ok: false, error: "GitHub client credentials not configured"}
+    )
+    
+    string redirectUri = appURL ++ "/auth/github"
+    string body = "client_id=" ++ GITHUB_CLIENT_ID ++ "&client_secret=" ++ GITHUB_CLIENT_SECRET ++ "&code=" ++ code ++ "&redirect_uri=" ++ redirectUri
+    
+    // 添加code verifier（如果有）
+    if codeVerifier != "" (
+        body = body ++ "&code_verifier=" ++ codeVerifier
+    )
+    
+    object resp = requests.Post(GITHUB_TOKEN_URL, {
+        body: body,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/json"
+    })
+    
+    if !resp.success (
+        return {ok: false, error: "failed to get access token"}
+    )
+    
+    object data = resp.body.toStr().JsonParse().assert(object)
+    
+    if data.contains("error") (
+        return {ok: false, error: data.error.toStr()}
+    )
+    
+    return {
+        ok: true,
+        access_token: data.access_token.toStr()
+    }
+)
+
+// Get user info from GitHub API
+def getGitHubUserInfo(string accessToken) object (
+    object resp = requests.Get(GITHUB_USER_URL, {
+        "Authorization": "token " ++ accessToken,
+        "Accept": "application/vnd.github.v3+json"
+    })
+    
+    if !resp.success (
+        return {ok: false, error: "failed to get user info"}
+    )
+    
+    object userData = resp.body.toStr().JsonParse().assert(object)
+    
+    return {
+        ok: true,
+        id: userData.id.toStr(),
+        username: userData.login.toStr(),
+        name: userData.name != null ? userData.name.toStr() : userData.login.toStr(),
+        avatar: userData.avatar_url.toStr()
+    }
+)
+
+// Handle GitHub OAuth callback
+def handleGitHubAuth(*gin.Context c) (
+    string code = c.PostForm("code")
+    string codeVerifier = c.PostForm("code_verifier")
+    
+    if code == "" (
+        c.JSON(400, {ok: false, error: "missing code"})
+        return
+    )
+    
+    // Get access token
+    object tokenResult = getGitHubAccessToken(code, codeVerifier)
+    if !tokenResult.ok (
+        c.JSON(401, {ok: false, error: tokenResult.error})
+        return
+    )
+    
+    // Get user info
+    object userResult = getGitHubUserInfo(tokenResult.access_token.toStr())
+    if !userResult.ok (
+        c.JSON(401, {ok: false, error: userResult.error})
+        return
+    )
+    
+    string userId = "github:" ++ userResult.id.toStr()
+    string username = userResult.username.toStr()
+    string avatarUrl = userResult.avatar.toStr()
+    
+    // Create or update user with avatar
+    auto userData = getUser(userId, "github")
+    if userData.ok (
+        object storedUser = userData.user.assert(object)
+        storedUser.avatar = avatarUrl
+        string path = usersDir ++ userId ++ ".json"
+        writeFile(path, storedUser)
+    ) else (
+        object user = {
+            username: username,
+            authType: "github",
+            avatar: avatarUrl,
+            themes: [],
+            createdAt: timestamp
+        }
+        string path = usersDir ++ userId ++ ".json"
+        writeFile(path, user)
+    )
+    
+    // Create session
+    string sessionId = createSession(userId, "github")
+    setAuthCookie(c, sessionId, "github")
+    
+    c.JSON(200, {ok: true, sessionId: sessionId, username: username})
 )

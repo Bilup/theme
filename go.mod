@@ -1,4 +1,4 @@
-module warptheme
+module bilme
 
 go 1.25.0
 

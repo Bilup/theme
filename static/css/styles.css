@@ -5,12 +5,12 @@
 }
 
 :root {
-    --primary-color: #d399e5;
-    --primary-light: #e0b3ed;
-    --primary-dark: #b07ec2;
-    --secondary-color: #c084d4;
-    --accent-color: #d399e5;
-    --accent-dark: #b07ec2;
+    --primary-color: #75c1c4;
+    --primary-light: #8fd0d3;
+    --primary-dark: #5fa9ad;
+    --secondary-color: #75c1c4;
+    --accent-color: #75c1c4;
+    --accent-dark: #5fa9ad;
     --success-color: #2ecc71;
     --danger-color: #e74c3c;
     --warning-color: #f39c12;
@@ -228,7 +228,7 @@ button#logout-btn {
         color: var(--danger-color);
         border-top: 1px solid var(--border-color);
 
-        &:hover { color: #f5b7b1; }
+        &:hover { color: #75c1c4; }
     }
 }
 
@@ -655,7 +655,7 @@ button#logout-btn {
         color: var(--danger-color);
 
         &:hover {
-            color: #f5b7b1;
+            color: #75c1c4;
             border-width: 3px;
         }
     }
@@ -842,29 +842,6 @@ button#logout-btn {
         background: var(--card-bg);
         padding: 0 1rem;
         color: var(--text-light);
-    }
-}
-
-.rotur-form {
-    & .input-group { margin-bottom: 1rem; }
-
-    & label {
-        display: block;
-        margin-bottom: 0.5rem;
-        font-weight: 500;
-    }
-
-    & input {
-        width: 100%;
-        padding: 0.75rem;
-        border: 2px solid var(--border-color);
-        border-radius: var(--border-radius);
-        font-size: 1rem;
-
-        &:focus {
-            outline: none;
-            border-color: var(--primary-color);
-        }
     }
 }
 

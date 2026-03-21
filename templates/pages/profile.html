@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{.ProfileUser.username}}'s Profile - WarpTheme</title>
+    <title>{{.ProfileUser.username}}'s Profile - Bilme</title>
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=stylesheet" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/styles.css">
 </head>
 <body>
@@ -14,14 +15,12 @@
     <main class="main-content">
         <div class="profile-header">
             <div class="profile-avatar">
-                {{if eq .AuthType "scratch"}}
+                {{if eq .AuthType "github"}}
                 {{if .ProfileUser.avatar}}
                 <img src="{{.ProfileUser.avatar}}" alt="{{.ProfileUser.username}}">
                 {{else}}
-                <img src="{{getScratchUserAvatarURL .ProfileUser.username}}" alt="{{.ProfileUser.username}}">
+                <img src="https://github.com/{{.ProfileUser.username}}.png" alt="{{.ProfileUser.username}}">
                 {{end}}
-                {{else if eq .AuthType "rotur"}}
-                <img src="https://avatars.rotur.dev/{{.ProfileUser.username}}" alt="{{.ProfileUser.username}}">
                 {{end}}
             </div>
             <div class="profile-info">

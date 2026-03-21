@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{.Theme.name}} - WarpTheme</title>
+    <title>{{.Theme.name}} - Bilme</title>
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=stylesheet" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/styles.css">
 </head>
 <body>
@@ -101,26 +102,26 @@
                         <p>{{if .Theme.description}}{{.Theme.description}}{{else}}No description provided.{{end}}</p>
                     </div>
                     
-                    {{if .Theme.theme.platformData.mistwarp}}
+                    {{if .Theme.theme.platformData.bilup}}
                     <div class="theme-specs">
-                        <h2>MistWarp Settings</h2>
+                        <h2>Bilup Settings</h2>
                         <div class="spec-grid">
-                            {{if .Theme.theme.platformData.mistwarp.gui}}
+                            {{if .Theme.theme.platformData.bilup.gui}}
                             <div class="spec-item">
                                 <div class="spec-label">GUI Mode</div>
-                                <div class="spec-value">{{.Theme.theme.platformData.mistwarp.gui}}</div>
+                                <div class="spec-value">{{.Theme.theme.platformData.bilup.gui}}</div>
                             </div>
                             {{end}}
-                            {{if .Theme.theme.platformData.mistwarp.blocks}}
+                            {{if .Theme.theme.platformData.bilup.blocks}}
                             <div class="spec-item">
                                 <div class="spec-label">Blocks Style</div>
-                                <div class="spec-value">{{.Theme.theme.platformData.mistwarp.blocks}}</div>
+                                <div class="spec-value">{{.Theme.theme.platformData.bilup.blocks}}</div>
                             </div>
                             {{end}}
-                            {{if .Theme.theme.platformData.mistwarp.menuBarAlign}}
+                            {{if .Theme.theme.platformData.bilup.menuBarAlign}}
                             <div class="spec-item">
                                 <div class="spec-label">Menu Alignment</div>
-                                <div class="spec-value">{{.Theme.theme.platformData.mistwarp.menuBarAlign}}</div>
+                                <div class="spec-value">{{.Theme.theme.platformData.bilup.menuBarAlign}}</div>
                             </div>
                             {{end}}
                         </div>
@@ -155,14 +156,12 @@
             <aside class="author-sidebar">
                 <div class="author-card">
                     <div class="author-avatar-wrapper">
-                        {{if eq .AuthorAuthType "scratch"}}
+                        {{if eq .AuthorAuthType "github"}}
                         {{if and .AuthorUser.avatar (ne .AuthorUser.avatar "")}}
                         <img src="{{.AuthorUser.avatar}}" alt="{{.AuthorUser.username}}" class="author-avatar-large">
                         {{else}}
-                        <img src="{{getScratchUserAvatarURL .AuthorUser.username}}" alt="{{.AuthorUser.username}}" class="author-avatar-large">
+                        <img src="https://github.com/{{.AuthorUser.username}}.png" alt="{{.AuthorUser.username}}" class="author-avatar-large">
                         {{end}}
-                        {{else if eq .AuthorAuthType "rotur"}}
-                        <img src="https://avatars.rotur.dev/{{.AuthorUser.username}}" alt="{{.AuthorUser.username}}" class="author-avatar-large">
                         {{end}}
                     </div>
                     <h3 class="author-name">{{formatUsername .AuthorUser.username .AuthorAuthType}}</h3>

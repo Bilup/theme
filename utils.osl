@@ -15,24 +15,11 @@ def encodeBase64URLSafe(string str) string (
     return result
 )
 
-def getScratchUserAvatarURL(string username) string (
-    string actualUsername = username
-    if actualUsername.startsWith("@") (
-        actualUsername = actualUsername.trim(2, actualUsername.len)
-    )
-    return "https://uploads.scratch.mit.edu/get_image/user/" ++ actualUsername ++ "_90x90.png"
-)
-
 def safeStyle(string str) any (
     return raw("template.CSS(str)")
 )
 
 def formatUsername(string username, string authType) string (
-    if authType == "scratch" (
-        if !username.startsWith("@") (
-            return "@" ++ username
-        )
-    )
     return username
 )
 
@@ -243,7 +230,16 @@ def formatDate(any dateInput) string (
     raw("  case string:")
     raw("    dateStr = v")
     raw("  case json.Number:")
-    raw("    dateStr = v.String()")
+    raw("    ts, err := v.Float64()")
+    raw("    if err == nil {")
+    raw("      if ts > 1e12 {")
+    raw("        dateStr = time.UnixMilli(int64(ts)).Format(time.RFC3339)")
+    raw("      } else {")
+    raw("        dateStr = time.Unix(int64(ts), 0).Format(time.RFC3339)")
+    raw("      }")
+    raw("    } else {")
+    raw("      dateStr = v.String()")
+    raw("    }")
     raw("  case float64:")
     raw("    ts := int64(v)")
     raw("    if ts > 1e12 {")

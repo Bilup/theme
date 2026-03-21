@@ -1,7 +1,7 @@
 {{define "nav"}}
 <nav class="navbar">
     <div class="nav-container">
-        <a href="/themes" class="nav-brand">WarpTheme</a>
+        <a href="/themes" class="nav-brand">Bilme</a>
         
         <div class="nav-links">
             <a href="/" class="nav-link {{if eq .ActivePage "home"}}active{{end}}">
@@ -26,14 +26,12 @@
             {{if .User}}
             <div class="nav-user-dropdown">
                 <button id="user-menu-btn" class="nav-user-btn">
-                    {{if eq .User.authType "scratch"}}
+                    {{if eq .User.authType "github"}}
                     {{if .User.avatar}}
                     <img src="{{.User.avatar}}" alt="{{.User.username}}" class="nav-avatar">
                     {{else}}
-                    <img src="{{getScratchUserAvatarURL .User.username}}" alt="{{.User.username}}" class="nav-avatar">
+                    <img src="https://github.com/{{.User.username}}.png" alt="{{.User.username}}" class="nav-avatar">
                     {{end}}
-                    {{else if eq .User.authType "rotur"}}
-                    <img src="https://avatars.rotur.dev/{{.User.username}}" alt="{{.User.username}}" class="nav-avatar">
                     {{end}}
                     <span class="nav-username">{{formatUsername .User.username .User.authType}}</span>
                     <i data-lucide="chevron-down" class="dropdown-icon"></i>

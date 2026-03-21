@@ -35,14 +35,12 @@
         {{with index $users $theme.author}}
 <div class="theme-author">
   <a href="/u/{{$theme.author}}" class="author-link">
-    {{if eq .authType "scratch"}}
+    {{if eq .authType "github"}}
     {{if .avatar}}
     <img src="{{.avatar}}" alt="{{.username}}" class="author-avatar">
     {{else}}
-    <img src="{{getScratchUserAvatarURL .username}}" alt="{{.username}}" class="author-avatar">
+    <img src="https://github.com/{{.username}}.png" alt="{{.username}}" class="author-avatar">
     {{end}}
-    {{else if eq .authType "rotur"}}
-    <img src="https://avatars.rotur.dev/{{.username}}" alt="{{.username}}" class="author-avatar">
     {{else}}
     <div class="author-avatar avatar-placeholder">{{.username}}</div>
     {{end}}

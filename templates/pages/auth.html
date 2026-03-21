@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - WarpTheme</title>
+    <title>Login - Bilme</title>
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=stylesheet" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/styles.css">
 </head>
 <body>
@@ -13,36 +14,22 @@
         <div class="auth-card">
             <div class="auth-header">
                 <i data-lucide="palette" class="auth-logo"></i>
-                <h1>Welcome to WarpTheme</h1>
-                <p>Choose your preferred login method</p>
+                <h1>Welcome to Bilme</h1>
+                <p>Sign in with GitHub to continue</p>
             </div>
             
             <div class="auth-providers">
                 <div class="auth-providers-header">
                     <p>Login with</p>
                 </div>
-                
                 <div class="auth-options">
-                    <a id="rotur-btn" href="https://rotur.dev/auth?return_to=" class="auth-btn rotur">
+                    <a id="github-btn" href="#" class="auth-btn github">
                         <div class="auth-btn-logo">
-                            <img src="https://rotur.dev/favicon.ico" alt="Rotur">
+                            <img src="https://github.com/favicon.ico" alt="GitHub">
                         </div>
                         <div class="auth-btn-content">
-                            <strong>Rotur</strong>
-                            <span>Seamless auth for web services</span>
-                        </div>
-                        <div class="auth-btn-arrow">
-                            <i data-lucide="arrow-right"></i>
-                        </div>
-                    </a>
-
-                    <a href="/auth/scratch" class="auth-btn scratch">
-                        <div class="auth-btn-logo">
-                            <img src="https://scratch.mit.edu/images/logo_sm.png" alt="Scratch">
-                        </div>
-                        <div class="auth-btn-content">
-                            <strong>Scratch</strong>
-                            <span>MIT's creative learning platform</span>
+                            <strong>GitHub</strong>
+                            <span>Sign in with your GitHub account</span>
                         </div>
                         <div class="auth-btn-arrow">
                             <i data-lucide="arrow-right"></i>
@@ -52,15 +39,16 @@
             </div>
             
             <div class="auth-footer">
-                <a href="https://scratch.mit.edu/join" target="_blank" class="auth-footer-link">Sign up for Scratch</a>
-                <span class="auth-footer-divider">•</span>
-                <a href="https://rotur.dev" target="_blank" class="auth-footer-link">Learn about Rotur</a>
+                <a href="https://github.com/signup" target="_blank" class="auth-footer-link">Sign up for GitHub</a>
             </div>
         </div>
     </main>
 
     {{template "footer" .}}
 
+    <script>
+        window.GITHUB_CLIENT_ID = "{{.GITHUB_CLIENT_ID}}";
+    </script>
     <script src="/static/js/auth.js"></script>
     <script>
         lucide.createIcons();

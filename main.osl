@@ -19,10 +19,11 @@ string modsFile = "mods.json"
 
 object themeAuthorCache = {}
 
-string appURL = "http://localhost:5609"
-
-string scratchAuthURL = "https://auth.itinerary.eu.org/auth/"
-string scratchVerifyURL = "https://auth.itinerary.eu.org/api/auth/verifyToken"
+string appURL = "https://theme.bilup.org"
+string GITHUB_CLIENT_ID = ""
+string GITHUB_CLIENT_SECRET = ""
+string GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token"
+string GITHUB_USER_URL = "https://api.github.com/user"
 
 import "./storage.osl"
 import "./auth.osl"
@@ -34,8 +35,26 @@ import "./theme-converter.osl"
 
 import "github.com/gin-gonic/gin"
 
+// Load secrets from secrets.json
+def loadSecrets() (
+    if fs.Exists("secrets.json") (
+        string content = fs.ReadFile("secrets.json")
+        auto parseResult = content.JsonParse()
+        if parseResult != null (
+            object secrets = parseResult.assert(object)
+            if secrets.contains("GITHUB_CLIENT_ID") (
+                GITHUB_CLIENT_ID = secrets.GITHUB_CLIENT_ID.toStr()
+            )
+            if secrets.contains("GITHUB_CLIENT_SECRET") (
+                GITHUB_CLIENT_SECRET = secrets.GITHUB_CLIENT_SECRET.toStr()
+            )
+        )
+    )
+)
+
 mainloop:
 
+    loadSecrets()
     ensureDirectories()
     rebuildIndexWithAccents()
 
@@ -44,7 +63,6 @@ mainloop:
     r.Use(authMiddleware)
     
     r.SetFuncMap({
-        "getScratchUserAvatarURL": getScratchUserAvatarURL,
         "formatNumber": formatNumber,
         "formatDate": formatDate,
         "encodeURIComponent": encodeURIComponent,
@@ -74,8 +92,8 @@ mainloop:
     r.GET("/about", aboutPage)
     r.GET("/logout", handleLogout)
     
-    r.GET("/auth/scratch", handleScratchAuthRedirect)
-    r.GET("/auth/scratch/callback", handleScratchAuthCallback)
+    r.GET("/auth/github", authPage)
+    r.POST("/auth/github", handleGitHubAuth)
     
     r.GET("/theme", themeDetailPage)
     r.GET("/themes/:username/:themename", themeDetailPageBySlug)
@@ -90,7 +108,6 @@ mainloop:
     api.Use(noCORS)
     api.GET("/health", handleHealth)
     api.GET("/user", handleGetCurrentUser)
-    api.GET("/auth", handleRoturAuth)
     api.GET("/mods", handleGetMods)
 
     api.GET("/settings/download", requireAuth, handleDownloadAllThemes)
@@ -115,4 +132,4 @@ mainloop:
     
     api.GET("/user/themes", handleGetUserThemes)
     
-    r.Run(":5609")
+    r.Run(":19876")

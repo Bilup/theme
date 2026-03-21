@@ -256,10 +256,7 @@ def ensureUser(string identifier, string authType, string username) object (
 )
 
 def addUserTheme(string identifier, string uuid) boolean (
-    auto userResult = getUser(identifier, "scratch")
-    if !userResult.ok (
-        userResult = getUser(identifier, "rotur")
-    )
+    auto userResult = getUser(identifier, "github")
     if !userResult.ok (
         return false
     )
@@ -276,10 +273,7 @@ def addUserTheme(string identifier, string uuid) boolean (
 )
 
 def removeUserTheme(string identifier, string uuid) boolean (
-    auto userResult = getUser(identifier, "scratch")
-    if !userResult.ok (
-        userResult = getUser(identifier, "rotur")
-    )
+    auto userResult = getUser(identifier, "github")
     if !userResult.ok (
         return false
     )
@@ -304,10 +298,7 @@ def loadUsersByIds(array userIds) object (
     object users = {}
     for i userIds.len (
         string userId = userIds[i].toStr()
-        auto userResult = getUser(userId, "scratch")
-        if !userResult.ok (
-            userResult = getUser(userId, "rotur")
-        )
+        auto userResult = getUser(userId, "github")
         if userResult.ok (
             users[userId] = userResult.user
         )
@@ -383,15 +374,11 @@ def createUserTheme(object themeData, string userId, string authType) object (
     object index = loadThemeIndex()
 
     string username = ""
-    if authType == "scratch" (
-        username = userId
-    ) else (
-        auto userResult = getUser(userId, authType)
-        if !userResult.ok (
-            return {ok: false, error: "user not found"}
-        )
-        username = userResult.user.username.toStr()
+    auto userResult = getUser(userId, authType)
+    if !userResult.ok (
+        return {ok: false, error: "user not found"}
     )
+    username = userResult.user.username.toStr()
 
     string uuid = generateUUID(username)
     string createdAt = time.Now().Format("2006-01-02T15:04:05.999Z")

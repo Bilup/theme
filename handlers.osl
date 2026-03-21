@@ -87,10 +87,10 @@ def handleDownloadTheme(*gin.Context c) (
         createdAt: ""
     }
     
-    if themeEntry.contains("platformData") and themeEntry.platformData.contains("mistwarp") (
-        object mistwarpData = themeEntry.platformData.mistwarp
-        if mistwarpData.contains("createdAt") (
-            metadata.createdAt = mistwarpData.createdAt
+    if themeEntry.contains("platformData") and themeEntry.platformData.contains("bilup") (
+        object bilupData = themeEntry.platformData.bilup
+        if bilupData.contains("createdAt") (
+            metadata.createdAt = bilupData.createdAt
         )
     )
     
@@ -133,10 +133,10 @@ def handleDownloadTheme(*gin.Context c) (
             menuBarAlign: themeEntry.menuBarAlign
         }
         
-        if targetPlatform == "mistwarp" (
+        if targetPlatform == "bilup" (
             exportData = {themes: [intermediate]}
         ) else (
-            auto convertResult = convertOldMistwarpToIntermediate(intermediate)
+            auto convertResult = convertOldBilupToIntermediate(intermediate)
             if convertResult.ok (
                 intermediate = convertResult.intermediate
                 auto exportResult = exportToPlatform(intermediate, targetPlatform, metadata)
@@ -231,10 +231,10 @@ def handleExportToPlatform(*gin.Context c) (
         createdAt: ""
     }
     
-    if themeEntry.contains("platformData") and themeEntry.platformData.contains("mistwarp") (
-        object mistwarpData = themeEntry.platformData.mistwarp
-        if mistwarpData.contains("createdAt") (
-            metadata.createdAt = mistwarpData.createdAt
+    if themeEntry.contains("platformData") and themeEntry.platformData.contains("bilup") (
+        object bilupData = themeEntry.platformData.bilup
+        if bilupData.contains("createdAt") (
+            metadata.createdAt = bilupData.createdAt
         )
     )
     
@@ -268,7 +268,7 @@ def handleExportToPlatform(*gin.Context c) (
             menuBarAlign: themeEntry.menuBarAlign
         }
         
-        auto convertResult = convertOldMistwarpToIntermediate(intermediate)
+        auto convertResult = convertOldBilupToIntermediate(intermediate)
         if convertResult.ok (
             intermediate = convertResult.intermediate
             auto exportResult = exportToPlatform(intermediate, platform, metadata)
@@ -646,7 +646,7 @@ def handleGetRatings(*gin.Context c) (
 
 def handleGetUserThemes(*gin.Context c) (
     string username = c.Query("username")
-    string authType = c.DefaultQuery("authType", "scratch")
+    string authType = c.DefaultQuery("authType", "github")
 
     if username == "" (
         c.JSON(400, {ok: false, error: "missing username"})

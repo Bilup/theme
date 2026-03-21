@@ -70,7 +70,8 @@ def authPage(*gin.Context c) (
     )
 
     c.HTML(200, "auth.html", {
-        ActivePage: "auth"
+        ActivePage: "auth",
+        GITHUB_CLIENT_ID: GITHUB_CLIENT_ID
     })
 )
 
@@ -147,16 +148,10 @@ def renderThemeDetail(*gin.Context c, string uuid) (
 
     object authorUser = {}
     string authorAuthType = ""
-    auto userResult = getUser(author, "scratch")
+    auto userResult = getUser(author, "github")
     if userResult.ok (
         authorUser = userResult.user
-        authorAuthType = "scratch"
-    ) else (
-        userResult = getUser(author, "rotur")
-        if userResult.ok (
-            authorUser = userResult.user
-            authorAuthType = "rotur"
-        )
+        authorAuthType = "github"
     )
 
     object ratingsData = ratings
@@ -245,7 +240,7 @@ def uploadThemePage(*gin.Context c) (
 
 def userProfilePage(*gin.Context c) (
     string userId = c.Query("userId")
-    string authType = c.DefaultQuery("authType", "scratch")
+    string authType = c.DefaultQuery("authType","github")
     boolean authenticated = c.MustGet("authenticated").toStr() == "true"
 
     if userId == "" (

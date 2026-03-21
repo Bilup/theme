@@ -1,8 +1,8 @@
-# WarpTheme
+# Bilme
 
 A theme sharing site where themes can be rated and uploaded by anyone
 
-- Login with Scratch or Rotur
+- Login with GitHub
 - Share your exported themes
 - Browse other themes
 - Rate themes with likes/dislikes

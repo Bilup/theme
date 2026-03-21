@@ -32,7 +32,7 @@ def detectThemeSource(object themeJson) object (
     return {ok: true, platform: detectedPlatform}
 )
 
-def getMistwarpSourceTheme(object themeJson) object (
+def getBilupSourceTheme(object themeJson) object (
     if themeJson.contains("themes") and typeof(themeJson.themes) == "array" (
         array themes = themeJson.themes.toArray()
         if themes.len > 0 (
@@ -90,8 +90,8 @@ def normalizeThemeToIntermediate(object themeJson, string platformId) object (
     
     platformId = platformId.toLower()
     
-    if platformId == "mistwarp" (
-        object sourceTheme = getMistwarpSourceTheme(themeJson)
+    if platformId == "bilup" (
+        object sourceTheme = getBilupSourceTheme(themeJson)
         
         if sourceTheme.contains("accent") (
             object gradientInfo = extractGradientColors(sourceTheme.accent.assert(object))
@@ -109,22 +109,22 @@ def normalizeThemeToIntermediate(object themeJson, string platformId) object (
             intermediate.fonts = sourceTheme.fonts
         )
         
-        object mistwarpData = {}
+        object bilupData = {}
         if sourceTheme.contains("gui") (
-            mistwarpData.gui = sourceTheme.gui
+            bilupData.gui = sourceTheme.gui
         )
         if sourceTheme.contains("blocks") (
-            mistwarpData.blocks = sourceTheme.blocks
+            bilupData.blocks = sourceTheme.blocks
         )
         if sourceTheme.contains("menuBarAlign") (
-            mistwarpData.menuBarAlign = sourceTheme.menuBarAlign
+            bilupData.menuBarAlign = sourceTheme.menuBarAlign
         )
         if sourceTheme.contains("createdAt") (
-            mistwarpData.createdAt = sourceTheme.createdAt
+            bilupData.createdAt = sourceTheme.createdAt
         )
         
-        if mistwarpData.contains("gui") or mistwarpData.contains("blocks") or mistwarpData.contains("menuBarAlign") (
-            intermediate.platformData.mistwarp = mistwarpData
+        if bilupData.contains("gui") or bilupData.contains("blocks") or bilupData.contains("menuBarAlign") (
+            intermediate.platformData.bilup = bilupData
         )
     ) else if platformId == "nitrobolt" (
         if themeJson.contains("gradient") (
@@ -176,8 +176,8 @@ def convertIntermediateToOriginal(object intermediate, string platformId) object
     string timeStr = time.Now().Format("2006-01-02T15:04:05.999Z").toStr()
     platformId = platformId.toLower()
     
-    if platformId == "mistwarp" (
-        object mistwarpTheme = {
+    if platformId == "bilup" (
+        object bilme = {
             accent: {
                 colors: intermediate.colors.gradient,
                 direction: intermediate.colors.gradientDirection
@@ -188,31 +188,31 @@ def convertIntermediateToOriginal(object intermediate, string platformId) object
             menuBarAlign: "center"
         }
         
-        if intermediate.platformData.contains("mistwarp") (
-            object mistwarpData = intermediate.platformData.mistwarp
-            if mistwarpData.contains("createdAt") (
-                mistwarpTheme.createdAt = mistwarpData.createdAt
+        if intermediate.platformData.contains("bilup") (
+            object bilupData = intermediate.platformData.bilup
+            if bilupData.contains("createdAt") (
+                bilme.createdAt = bilupData.createdAt
             )
-            if mistwarpData.contains("gui") (
-                mistwarpTheme.gui = mistwarpData.gui
+            if bilupData.contains("gui") (
+                bilme.gui = bilupData.gui
             )
-            if mistwarpData.contains("blocks") (
-                mistwarpTheme.blocks = mistwarpData.blocks
+            if bilupData.contains("blocks") (
+                bilme.blocks = bilupData.blocks
             )
-            if mistwarpData.contains("menuBarAlign") (
-                mistwarpTheme.menuBarAlign = mistwarpData.menuBarAlign
+            if bilupData.contains("menuBarAlign") (
+                bilme.menuBarAlign = bilupData.menuBarAlign
             )
         )
         
         if typeof(intermediate.wallpaper) == "object" (
-            mistwarpTheme.wallpaper = intermediate.wallpaper
+            bilme.wallpaper = intermediate.wallpaper
         )
         
         if typeof(intermediate.fonts) == "object" (
-            mistwarpTheme.fonts = intermediate.fonts
+            bilme.fonts = intermediate.fonts
         )
         
-        return {ok: true, theme: mistwarpTheme, platform: "mistwarp"}
+        return {ok: true, theme: bilme, platform: "bilup"}
     ) else if platformId == "nitrobolt" (
         object nitroboltTheme = {
             gradient: null,
@@ -247,12 +247,12 @@ def exportToPlatform(object intermediate, string targetPlatformId, object metada
     
     object theme = result.theme
     
-    if targetPlatformId.toLower() == "mistwarp" (
-        object mistwarpExport = {
+    if targetPlatformId.toLower() == "bilup" (
+        object bilupExport = {
             version: metadata.version ?? "2.0",
             timestamp: metadata.timestamp ?? timestamp,
             themes: [],
-            platform: "MistWarp"
+            platform: "Bilup"
         }
         
         object themeObj = theme
@@ -272,9 +272,9 @@ def exportToPlatform(object intermediate, string targetPlatformId, object metada
             themeObj.author = metadata.author
         )
         
-        mistwarpExport.themes = [themeObj]
+        bilupExport.themes = [themeObj]
         
-        return {ok: true, theme: mistwarpExport, platform: "mistwarp"}
+        return {ok: true, theme: bilupExport, platform: "bilup"}
     ) else if targetPlatformId.toLower() == "nitrobolt" (
         return {ok: true, theme: theme, platform: "nitrobolt"}
     )
@@ -282,7 +282,7 @@ def exportToPlatform(object intermediate, string targetPlatformId, object metada
     return {ok: false, error: "unsupported target platform"}
 )
 
-def convertOldMistwarpToIntermediate(object oldTheme) object (
+def convertOldBilupToIntermediate(object oldTheme) object (
     object intermediate = {
         colors: {
             primary: "#4c97ff",
@@ -296,7 +296,7 @@ def convertOldMistwarpToIntermediate(object oldTheme) object (
         },
         wallpaper: {},
         fonts: {google: [], system: []},
-        platformData: {mistwarp: {}}
+        platformData: {bilup: {}}
     }
     
     if oldTheme.contains("accent") (
@@ -307,19 +307,19 @@ def convertOldMistwarpToIntermediate(object oldTheme) object (
         intermediate.colors.gradientDirection = gradientInfo.direction
     )
     
-    object mistwarpData = intermediate.platformData.mistwarp.assert(object)
+    object bilupData = intermediate.platformData.bilup.assert(object)
     
     if oldTheme.contains("gui") (
-        mistwarpData.gui = oldTheme.gui
+        bilupData.gui = oldTheme.gui
     )
     if oldTheme.contains("blocks") (
-        mistwarpData.blocks = oldTheme.blocks
+        bilupData.blocks = oldTheme.blocks
     )
     if oldTheme.contains("menuBarAlign") (
-        mistwarpData.menuBarAlign = oldTheme.menuBarAlign
+        bilupData.menuBarAlign = oldTheme.menuBarAlign
     )
     if oldTheme.contains("createdAt") (
-        mistwarpData.createdAt = oldTheme.createdAt
+        bilupData.createdAt = oldTheme.createdAt
     )
     
     if oldTheme.contains("wallpaper") (
@@ -330,7 +330,7 @@ def convertOldMistwarpToIntermediate(object oldTheme) object (
         intermediate.fonts = oldTheme.fonts
     )
     
-    intermediate.platformData.mistwarp = mistwarpData
+    intermediate.platformData.bilup = bilupData
     
     return {ok: true, intermediate: intermediate}
 )
