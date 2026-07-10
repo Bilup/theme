@@ -34,3 +34,5 @@ warptheme
 main
 main.go
 data/
+
+.DS_Store
