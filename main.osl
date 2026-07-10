@@ -38,6 +38,12 @@ import "./theme-converter.osl"
 ensureDirectories()
 rebuildIndexWithAccents()
 
+def applyMiddleWare(*serve.router r) (
+    r.use(corsMiddleware)
+    r.use(serve.maxBodySize(262144))
+    r.use(authMiddleware)
+)
+
 *serve.Router app = serve.new()
 
 app.setFuncMap({
@@ -65,9 +71,7 @@ app.setFuncMap({
 app.loadHTMLGlob("templates/**/*.html")
 app.static("/static", "./static")
 
-app.use(corsMiddleware)
-app.use(serve.maxBodySize(262144))
-app.use(authMiddleware)
+applyMiddleWare(app)
 
 app.GET("/", homePage)
 app.GET("/themes", themesPage)
@@ -85,6 +89,7 @@ app.GET("/likes", requireAuth, likedThemesPage)
 app.GET("/settings", requireAuth, settingsPage)
 
 *serve.Router api = app.group("/api")
+applyMiddleWare(api)
 api.GET("/health", handleHealth)
 api.GET("/user", handleGetCurrentUser)
 api.GET("/auth", handleRoturAuth)
