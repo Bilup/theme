@@ -1,14 +1,30 @@
-def handleHealth(*gin.Context c) (
-    c.JSON(200, {ok: true, status: "healthy"})
+def handleHealth(*serve.Context c) (
+    c.json(200, {ok: true, status: "healthy"})
 )
 
-def handleGetMods(*gin.Context c) (
+def handleGetMods(*serve.Context c) (
     auto modsData = loadMods()
-    c.JSON(200, {ok: true, mods: modsData.mods})
+    c.json(200, {ok: true, mods: modsData.mods})
 )
 
-def handleGetThemes(*gin.Context c) (
-    string sortBy = c.DefaultQuery("sort", "newest")
+def handleGetCurrentUser(*serve.Context c) (
+    if !c.getBool("authenticated") (
+        c.json(401, {ok: false, error: "not authenticated"})
+        return
+    )
+
+    c.json(200, {
+        ok: true,
+        user: c.get("user"),
+        authType: c.getString("authType"),
+        userId: c.getString("userId"),
+        isAdmin: c.getBool("isAdmin")
+    })
+)
+
+def handleGetThemes(*serve.Context c) (
+    string sortBy = c.queryDefault("sort", "newest")
+    string platformFilter = c.query("platform").toLower()
 
     if sortBy != "newest" and sortBy != "likes" and sortBy != "name" (
         sortBy = "newest"
@@ -17,114 +33,113 @@ def handleGetThemes(*gin.Context c) (
     auto result = listThemes(sortBy)
 
     if !result.ok (
-        c.JSON(500, {ok: false, error: "failed to load themes"})
+        c.json(500, {ok: false, error: "failed to load themes"})
         return
     )
 
-    c.JSON(200, {ok: true, themes: result.themes})
+    array themes = result.themes.assert(array)
+
+    if platformFilter != "" (
+        array filtered = []
+        for i themes.len (
+            object theme = themes[i]
+            if theme.platform.toStr().toLower() == platformFilter (
+                filtered.append(theme)
+            )
+        )
+        themes = filtered
+    )
+
+    c.json(200, {ok: true, themes: themes})
 )
 
-def handleGetTheme(*gin.Context c) (
-    string uuid = c.Query("uuid").toStr()
+def handleGetTheme(*serve.Context c) (
+    string uuid = c.query("uuid")
 
     if uuid == "" (
-        c.JSON(400, {ok: false, error: "missing uuid"})
+        c.json(400, {ok: false, error: "missing uuid"})
         return
     )
 
     auto result = getTheme(uuid)
 
     if !result.ok (
-        c.JSON(404, {ok: false, error: "theme not found"})
+        c.json(404, {ok: false, error: "theme not found"})
         return
     )
 
-    c.JSON(200, {ok: true, theme: result.theme})
+    object theme = result.theme
+    object ratings = getRatings(uuid)
+    theme.likes = ratings.likes
+    theme.dislikes = ratings.dislikes
+    theme.downloads = getDownloadCount(uuid)
+
+    c.json(200, {ok: true, theme: theme})
 )
 
-def handleDownloadTheme(*gin.Context c) (
-    string uuid = c.Query("uuid").toStr()
-    string platform = c.DefaultQuery("platform", "").toStr().toLower()
-
-    if uuid == "" (
-        c.JSON(400, {ok: false, error: "missing uuid"})
-        return
-    )
-
-    auto result = loadThemeFile(uuid)
-
-    if !result.ok (
-        c.JSON(404, {ok: false, error: "theme not found"})
-        return
-    )
-
-    object themeData = result.data.assert(object)
-    object themeEntry = themeData.theme.assert(object)
-
-    string targetPlatform = ""
-    if platform == "" (
-        targetPlatform = themeData.platform.toStr()
-    ) else (
-        targetPlatform = platform
-    )
-
-    if targetPlatform == "" (
-        c.JSON(400, {ok: false, error: "could not determine platform"})
-        return
-    )
-
-    object exportData = {}
-    object convertResult = {}
-    object intermediate = {}
-    
+def buildExportMetadata(object themeData, object themeEntry) object (
     object metadata = {
         uuid: themeData.uuid,
         version: themeData.version ?? "2.0",
         timestamp: themeData.timestamp ?? timestamp,
         name: themeData.name ?? "",
-        description: themeData.description.toStr(),
-        author: themeData.author.toStr(),
+        description: (themeData.description ?? "").toStr(),
+        author: (themeData.author ?? "").toStr(),
         createdAt: ""
     }
-    
-    if themeEntry.contains("platformData") and themeEntry.platformData.contains("mistwarp") (
-        object mistwarpData = themeEntry.platformData.mistwarp
-        if mistwarpData.contains("createdAt") (
-            metadata.createdAt = mistwarpData.createdAt
+
+    if themeEntry.contains("platformData") (
+        object platformData = themeEntry.platformData.assert(object)
+        if platformData.contains("mistwarp") (
+            object mistwarpData = platformData.mistwarp
+            if mistwarpData.contains("createdAt") (
+                metadata.createdAt = mistwarpData.createdAt
+            )
         )
     )
-    
-    if metadata.createdAt == "" and themeEntry.contains("accent") (
-        if themeEntry.contains("createdAt") (
-            metadata.createdAt = themeEntry.createdAt
-        )
+
+    if metadata.createdAt == "" and themeEntry.contains("createdAt") (
+        metadata.createdAt = themeEntry.createdAt
     )
-    
+
+    return metadata
+)
+
+def exportThemeForPlatform(string uuid, string platform) object (
+    auto result = loadThemeFile(uuid)
+
+    if !result.ok (
+        return {ok: false, status: 404, error: "theme not found"}
+    )
+
+    object themeData = result.data.assert(object)
+    object themeEntry = themeData.theme.assert(object)
+
+    string targetPlatform = platform
+    if targetPlatform == "" (
+        targetPlatform = (themeData.platform ?? "").toStr().toLower()
+    )
+
+    if targetPlatform == "" (
+        return {ok: false, status: 400, error: "could not determine platform"}
+    )
+
+    if !isSupportedMod(targetPlatform) (
+        return {ok: false, status: 400, error: "unsupported platform: " ++ targetPlatform}
+    )
+
+    object metadata = buildExportMetadata(themeData, themeEntry)
+    object intermediate = {}
+
     if themeEntry.contains("colors") (
-        object intermediate = {
+        intermediate = {
             colors: themeEntry.colors,
             wallpaper: themeEntry.wallpaper,
             fonts: themeEntry.fonts,
             platformData: themeEntry.platformData
         }
-        
-        if platform == "" (
-            auto convertResult = convertIntermediateToOriginal(intermediate, targetPlatform)
-            if !convertResult.ok (
-                c.JSON(500, {ok: false, error: "failed to convert theme: " ++ convertResult.error})
-                return
-            )
-            exportData = convertResult.theme
-        ) else (
-            convertResult = exportToPlatform(intermediate, targetPlatform, metadata)
-            if !convertResult.ok (
-                c.JSON(500, {ok: false, error: "failed to export theme: " ++ convertResult.error})
-                return
-            )
-            exportData = convertResult.theme
-        )
     ) else if themeEntry.contains("accent") (
-        intermediate = {
+        object oldFormat = {
             accent: themeEntry.accent,
             wallpaper: themeEntry.wallpaper,
             fonts: themeEntry.fonts,
@@ -132,21 +147,46 @@ def handleDownloadTheme(*gin.Context c) (
             blocks: themeEntry.blocks,
             menuBarAlign: themeEntry.menuBarAlign
         }
-        
-        if targetPlatform == "mistwarp" (
-            exportData = {themes: [intermediate]}
-        ) else (
-            auto convertResult = convertOldMistwarpToIntermediate(intermediate)
-            if convertResult.ok (
-                intermediate = convertResult.intermediate
-                auto exportResult = exportToPlatform(intermediate, targetPlatform, metadata)
-                if !exportResult.ok (
-                    c.JSON(500, {ok: false, error: "failed to export theme: " ++ exportResult.error})
-                    return
-                )
-                exportData = exportResult.theme
-            )
+        auto convertResult = convertOldMistwarpToIntermediate(oldFormat)
+        if !convertResult.ok (
+            return {ok: false, status: 500, error: "failed to convert legacy theme"}
         )
+        intermediate = convertResult.intermediate
+    ) else (
+        return {ok: false, status: 500, error: "theme has no color data"}
+    )
+
+    auto exportResult = exportToPlatform(intermediate, targetPlatform, metadata)
+    if !exportResult.ok (
+        return {ok: false, status: 500, error: "failed to export theme: " ++ exportResult.error}
+    )
+
+    return {ok: true, theme: exportResult.theme, platform: targetPlatform}
+)
+
+def trackDownload(*serve.Context c, string uuid) (
+    if c.getBool("authenticated") (
+        string userId = c.getString("userId")
+        if !hasDownloaded(uuid, userId) (
+            recordDownload(uuid, userId)
+        )
+    )
+)
+
+def handleDownloadTheme(*serve.Context c) (
+    string uuid = c.query("uuid")
+    string platform = c.query("platform").toLower()
+
+    if uuid == "" (
+        c.json(400, {ok: false, error: "missing uuid"})
+        return
+    )
+
+    auto result = exportThemeForPlatform(uuid, platform)
+
+    if !result.ok (
+        c.json(result.status.toNum().toInt(), {ok: false, error: result.error})
+        return
     )
 
     string filename = uuid ++ ".json"
@@ -154,225 +194,136 @@ def handleDownloadTheme(*gin.Context c) (
         filename = uuid ++ "-" ++ platform ++ ".json"
     )
 
-    boolean authenticated = c.MustGet("authenticated").toBool()
-    if authenticated (
-        string userId = c.MustGet("userId").toStr()
-        if !hasDownloaded(uuid, userId) (
-            recordDownload(uuid, userId)
-        )
-    )
+    trackDownload(c, uuid)
 
-    c.Header("Content-Type", "application/json")
-    c.Header("Content-Disposition", "attachment; filename=" ++ filename)
-    c.JSON(200, exportData)
+    c.setHeader("Content-Disposition", "attachment; filename=" ++ filename)
+    c.json(200, result.theme)
 )
 
-def handleDetectPlatform(*gin.Context c) (
-    byte[] body = c.GetRawData().toArray()[1].assert(byte[])
-    string jsonStr = body.toStr()
-
-    if jsonStr == "" (
-        c.JSON(400, {ok: false, error: "theme data is required"})
-        return
-    )
-
-    object themeJson = jsonStr.JsonParse().assert(object)
-
-    auto detectResult = detectThemeSource(themeJson)
-
-    if !detectResult.ok (
-        c.JSON(400, {ok: false, error: "could not detect platform: " ++ detectResult.error})
-        return
-    )
-
-    c.JSON(200, {ok: true, platform: detectResult.platform})
-)
-
-def handleExportToPlatform(*gin.Context c) (
-    string uuid = c.Query("uuid").toStr()
-    string platform = c.Query("platform").toStr().toLower()
+def handleExportToPlatform(*serve.Context c) (
+    string uuid = c.query("uuid")
+    string platform = c.query("platform").toLower()
 
     if uuid == "" (
-        c.JSON(400, {ok: false, error: "missing uuid"})
+        c.json(400, {ok: false, error: "missing uuid"})
         return
     )
 
     if platform == "" (
-        c.JSON(400, {ok: false, error: "missing target platform"})
+        c.json(400, {ok: false, error: "missing target platform"})
         return
     )
 
-    if !isSupportedMod(platform) (
-        c.JSON(400, {ok: false, error: "unsupported platform: " ++ platform})
-        return
-    )
-
-    auto result = loadThemeFile(uuid)
+    auto result = exportThemeForPlatform(uuid, platform)
 
     if !result.ok (
-        c.JSON(404, {ok: false, error: "theme not found"})
+        c.json(result.status.toNum().toInt(), {ok: false, error: result.error})
         return
     )
 
-    object themeData = result.data.assert(object)
-    object themeEntry = themeData.theme.assert(object)
+    trackDownload(c, uuid)
 
-    object exportData = {}
-    object intermediate = {}
-    object exportResult = {}
-    
-    object metadata = {
-        uuid: themeData.uuid,
-        version: themeData.version ?? "2.0",
-        timestamp: themeData.timestamp ?? timestamp,
-        name: themeData.name ?? "",
-        description: themeData.description?toStr(),
-        author: themeData.author.toStr(),
-        createdAt: ""
-    }
-    
-    if themeEntry.contains("platformData") and themeEntry.platformData.contains("mistwarp") (
-        object mistwarpData = themeEntry.platformData.mistwarp
-        if mistwarpData.contains("createdAt") (
-            metadata.createdAt = mistwarpData.createdAt
-        )
-    )
-    
-    if metadata.createdAt == "" and themeEntry.contains("accent") (
-        if themeEntry.contains("createdAt") (
-            metadata.createdAt = themeEntry.createdAt
-        )
-    )
-    
-    if themeEntry.contains("colors") (
-        intermediate = {
-            colors: themeEntry.colors,
-            wallpaper: themeEntry.wallpaper,
-            fonts: themeEntry.fonts,
-            platformData: themeEntry.platformData
-        }
-        
-        exportResult = exportToPlatform(intermediate, platform, metadata)
-        if !exportResult.ok (
-            c.JSON(500, {ok: false, error: "failed to export theme: " ++ exportResult.error})
-            return
-        )
-        exportData = exportResult.theme
-    ) else if themeEntry.contains("accent") (
-        object intermediate = {
-            accent: themeEntry.accent,
-            wallpaper: themeEntry.wallpaper,
-            fonts: themeEntry.fonts,
-            gui: themeEntry.gui,
-            blocks: themeEntry.blocks,
-            menuBarAlign: themeEntry.menuBarAlign
-        }
-        
-        auto convertResult = convertOldMistwarpToIntermediate(intermediate)
-        if convertResult.ok (
-            intermediate = convertResult.intermediate
-            auto exportResult = exportToPlatform(intermediate, platform, metadata)
-            if !exportResult.ok (
-                c.JSON(500, {ok: false, error: "failed to export theme: " ++ exportResult.error})
-                return
-            )
-            exportData = exportResult.theme
-        )
-    )
-
-    string filename = uuid ++ "-" ++ platform ++ ".json"
-
-    boolean authenticated = c.MustGet("authenticated").toBool()
-    if authenticated (
-        string userId = c.MustGet("userId").toStr()
-        if !hasDownloaded(uuid, userId) (
-            recordDownload(uuid, userId)
-        )
-    )
-
-    c.Header("Content-Type", "application/json")
-    c.Header("Content-Disposition", "attachment; filename=" ++ filename)
-    c.JSON(200, exportData)
+    c.setHeader("Content-Disposition", "attachment; filename=" ++ uuid ++ "-" ++ platform ++ ".json")
+    c.json(200, result.theme)
 )
 
-def handleCreateTheme(*gin.Context c) (
-    string userId = c.MustGet("userId").toStr()
-    string authType = c.MustGet("authType").toStr()
+def handleDetectPlatform(*serve.Context c) (
+    object themeJson = c.bodyJSON()
 
-    byte[] body = c.GetRawData().toArray()[1].assert(byte[])
-    string jsonStr = body.toStr()
-
-    if jsonStr == "" (
-        c.JSON(400, {ok: false, error: "theme data is required"})
+    if themeJson.getKeys().toArray().len == 0 (
+        c.json(400, {ok: false, error: "theme data is required"})
         return
     )
 
-    object uploadData = jsonStr.JsonParse().assert(object)
-    array themesToUpload = uploadData["themes"].assert(array)
+    auto detectResult = detectThemeSource(themeJson)
 
-    if themesToUpload.len == 0 (
-        c.JSON(400, {ok: false, error: "no themes to upload"})
+    if !detectResult.ok (
+        c.json(400, {ok: false, error: "could not detect platform: " ++ detectResult.error})
+        return
+    )
+
+    c.json(200, {ok: true, platform: detectResult.platform})
+)
+
+def handleCreateTheme(*serve.Context c) (
+    string userId = c.getString("userId")
+    string authType = c.getString("authType")
+
+    object uploadData = c.bodyJSON()
+
+    if !uploadData.contains("themes") (
+        c.json(400, {ok: false, error: "no themes to upload"})
+        return
+    )
+
+    array themeItems = uploadData.themes.assert(array)
+
+    if themeItems.len == 0 (
+        c.json(400, {ok: false, error: "no themes to upload"})
         return
     )
 
     number maxSize = 10240
-    number totalSize = 0
-
-    array themeItems = themesToUpload.toArray()
-    object themeItem = {}
-    object themeJson = {}
-    string themeName = ""
-    string themeDescription = ""
-    string platform = ""
-    string jsonStrTheme = ""
-    number themeSize = 0
+    number userQuota = 102400
 
     for i themeItems.len (
-        themeItem = themeItems[i]
-        themeJson = themeItem["themeJson"]
-        themeName = themeItem["name"].toStr()
-        platform = themeItem["platform"].toStr()
+        object themeItem = themeItems[i]
+        string themeName = (themeItem.name ?? "").toStr().strip()
+        string platform = (themeItem.platform ?? "").toStr()
 
         if themeName == "" (
-            c.JSON(400, {ok: false, error: "theme name is required for all themes"})
+            c.json(400, {ok: false, error: "theme name is required for all themes"})
+            return
+        )
+
+        if themeName.len > 100 (
+            c.json(400, {ok: false, error: "theme names must be 100 characters or fewer"})
+            return
+        )
+
+        if (themeItem.description ?? "").toStr().len > 500 (
+            c.json(400, {ok: false, error: "theme descriptions must be 500 characters or fewer"})
             return
         )
 
         if platform == "" (
-            c.JSON(400, {ok: false, error: "theme platform is required for all themes"})
+            c.json(400, {ok: false, error: "theme platform is required for all themes"})
             return
         )
 
         if !isSupportedMod(platform) (
-            c.JSON(400, {ok: false, error: "unsupported mod: " ++ platform})
+            c.json(400, {ok: false, error: "unsupported mod: " ++ platform})
             return
         )
     )
 
+    number totalSize = 0
     auto userThemesResult = getUserThemes(userId, authType)
-
     if userThemesResult.ok (
-        array existingThemes = userThemesResult.themes.toArray()
+        array existingThemes = userThemesResult.themes.assert(array)
         for i existingThemes.len (
             object theme = existingThemes[i]
-            if theme.size != null (
-                totalSize += theme.size.toNum()
+            object index = loadThemeIndex()
+            object indexThemes = index.themes
+            string uuid = theme.uuid.toStr()
+            if indexThemes.contains(uuid) (
+                object entry = indexThemes[uuid]
+                if entry.contains("size") and entry.size != null (
+                    totalSize += entry.size.toNum()
+                )
             )
         )
     )
 
-    number userQuota = 102400
     number uploadedSize = 0
-
     for i themeItems.len (
-        themeItem = themeItems[i]
-        themeJson = themeItem["themeJson"]
-        jsonStrTheme = themeJson.JsonStringify()
-        uploadedSize = uploadedSize + jsonStrTheme.len.toNum()
+        object themeItem = themeItems[i]
+        string jsonStrTheme = json.stringify(themeItem.themeJson)
+        uploadedSize += jsonStrTheme.len
     )
 
     if (totalSize + uploadedSize) > userQuota (
-        c.JSON(400, {ok: false, error: "user storage quota exceeded (max 100KB)"})
+        c.json(400, {ok: false, error: "user storage quota exceeded (max 100KB)"})
         return
     )
 
@@ -380,14 +331,12 @@ def handleCreateTheme(*gin.Context c) (
     array errors = []
 
     for i themeItems.len (
-        themeItem = themeItems[i]
-        themeJson = themeItem["themeJson"]
-        themeName = themeItem["name"].toStr()
-        themeDescription = themeItem["description"].toStr()
-        platform = themeItem["platform"].toStr()
-
-        jsonStrTheme = themeJson.JsonStringify()
-        themeSize = jsonStrTheme.len.toNum()
+        object themeItem = themeItems[i]
+        string themeName = themeItem.name.toStr().strip()
+        string themeDescription = (themeItem.description ?? "").toStr()
+        string platform = themeItem.platform.toStr().toLower()
+        string jsonStrTheme = json.stringify(themeItem.themeJson)
+        number themeSize = jsonStrTheme.len
 
         if themeSize > maxSize (
             errors.append("theme '" ++ themeName ++ "' exceeds 10KB limit")
@@ -395,10 +344,8 @@ def handleCreateTheme(*gin.Context c) (
             object themeData = {
                 name: themeName,
                 description: themeDescription,
-                jsonData: themeJson,
+                jsonData: themeItem.themeJson,
                 size: themeSize,
-                author: userId,
-                authorType: authType,
                 platform: platform
             }
 
@@ -413,286 +360,208 @@ def handleCreateTheme(*gin.Context c) (
     )
 
     if createdUUIDs.len == 0 (
-        c.JSON(500, {ok: false, error: errors[1].toStr()})
+        c.json(400, {ok: false, error: errors[1].toStr()})
         return
     )
 
-    c.JSON(200, {ok: true, uuids: createdUUIDs, errors: errors})
+    c.json(200, {ok: true, uuids: createdUUIDs, errors: errors})
 )
 
-def handleUpdateThemeName(*gin.Context c) (
-    string userId = c.MustGet("userId").toStr()
+def handleUpdateThemeName(*serve.Context c) (
+    string userId = c.getString("userId")
 
-    byte[] body = c.GetRawData().toArray()[1].assert(byte[])
-    string jsonStr = body.toStr()
-    
-    object uploadData = jsonStr.JsonParse().assert(object)
-    string uuid = uploadData.uuid.toStr()
-    string name = uploadData.name.toStr()
-    string description = uploadData.description.toStr()
-    
+    object uploadData = c.bodyJSON()
+    string uuid = (uploadData.uuid ?? "").toStr()
+    string name = (uploadData.name ?? "").toStr().strip()
+    string description = (uploadData.description ?? "").toStr()
+
     if uuid == "" (
-        c.JSON(400, {ok: false, error: "missing uuid"})
+        c.json(400, {ok: false, error: "missing uuid"})
         return
     )
-    
+
     if name == "" (
-        c.JSON(400, {ok: false, error: "theme name is required"})
+        c.json(400, {ok: false, error: "theme name is required"})
+        return
+    )
+
+    if name.len > 100 or description.len > 500 (
+        c.json(400, {ok: false, error: "name or description is too long"})
         return
     )
 
     auto themeResult = getTheme(uuid)
 
     if !themeResult.ok (
-        c.JSON(404, {ok: false, error: "theme not found"})
+        c.json(404, {ok: false, error: "theme not found"})
         return
     )
 
-    string themeAuthor = getThemeAuthor(uuid)
-    print("Auth check - userId: " ++ userId ++ ", theme author: " ++ themeAuthor)
-
-    if themeAuthor != userId (
-        c.JSON(403, {ok: false, error: "not authorized"})
+    if getThemeAuthor(uuid) != userId (
+        c.json(403, {ok: false, error: "not authorized"})
         return
     )
 
     auto result = updateTheme(uuid, {name: name, description: description}, userId)
 
     if !result.ok (
-        c.JSON(500, {ok: false, error: result.error})
+        c.json(500, {ok: false, error: result.error})
         return
     )
 
-    c.JSON(200, {ok: true})
+    c.json(200, {ok: true})
 )
 
-def handleUpdateTheme(*gin.Context c) (
-    string userId = c.MustGet("userId").toStr()
-
-    string uuid = c.PostForm("uuid")
+def handleDeleteTheme(*serve.Context c) (
+    string userId = c.getString("userId")
+    boolean isAdmin = c.getBool("isAdmin")
+    string uuid = c.query("uuid")
 
     if uuid == "" (
-        c.JSON(400, {ok: false, error: "missing uuid"})
+        c.json(400, {ok: false, error: "missing uuid"})
         return
     )
 
-    auto themeResult = getTheme(uuid)
-
-    if !themeResult.ok (
-        c.JSON(404, {ok: false, error: "theme not found"})
-        return
-    )
-
-    if getThemeAuthor(uuid) != userId (
-        c.JSON(403, {ok: false, error: "not authorized"})
-        return
-    )
-
-    auto updates = {}
-
-    string name = c.PostForm("name")
-    string description = c.PostForm("description")
-    string gui = c.PostForm("gui")
-    string blocks = c.PostForm("blocks")
-    string menuBarAlign = c.PostForm("menuBarAlign")
-    string accentColors = c.PostForm("accentColors")
-    string wallpaperURL = c.PostForm("wallpaperURL")
-    string wallpaperOpacity = c.PostForm("wallpaperOpacity")
-    string wallpaperDarkness = c.PostForm("wallpaperDarkness")
-
-    if name != "" (
-        updates.name = name
-    )
-
-    if description != "" (
-        updates.description = description
-    )
-
-    if gui != "" (
-        updates.gui = gui
-    )
-
-    if blocks != "" (
-        updates.blocks = blocks
-    )
-
-    if menuBarAlign != "" (
-        updates.menuBarAlign = menuBarAlign
-    )
-
-    auto accentUpdate = {}
-    boolean hasAccentUpdate = false
-
-    if accentColors != "" (
-        auto accentColorsArr = []
-        auto colors = accentColors.split(",")
-        for i colors.len (
-            auto colorParts = colors[i].toStr().split("|")
-            if colorParts.len == 2 (
-                accentColorsArr.append({
-                    color: colorParts[1].toStr(),
-                    position: colorParts[2].toNum()
-                })
-            )
-        )
-
-        if accentColorsArr.len > 0 (
-            accentUpdate.colors = accentColorsArr
-            hasAccentUpdate = true
-        )
-    )
-
-    if hasAccentUpdate (
-        updates.accent = accentUpdate
-    )
-
-    auto wallpaperUpdate = {}
-    boolean hasWallpaperUpdate = false
-
-    if wallpaperURL != "" (
-        wallpaperUpdate.url = wallpaperURL
-        hasWallpaperUpdate = true
-    )
-
-    if wallpaperOpacity != "" (
-        wallpaperUpdate.opacity = wallpaperOpacity.toNum()
-        hasWallpaperUpdate = true
-    )
-
-    if wallpaperDarkness != "" (
-        wallpaperUpdate.darkness = wallpaperDarkness.toNum()
-        hasWallpaperUpdate = true
-    )
-
-    if hasWallpaperUpdate (
-        updates.wallpaper = wallpaperUpdate
-    )
-
-    auto result = updateTheme(uuid, updates, userId)
+    auto result = deleteTheme(uuid, userId, isAdmin)
 
     if !result.ok (
-        c.JSON(500, {ok: false, error: result.error})
+        if result.error.toStr() == "not authorized" (
+            c.json(403, {ok: false, error: "not authorized"})
+            return
+        )
+        if result.error.toStr() == "theme not found" (
+            c.json(404, {ok: false, error: "theme not found"})
+            return
+        )
+        c.json(500, {ok: false, error: result.error})
         return
     )
 
-    c.JSON(200, {ok: true})
+    c.json(200, {ok: true})
 )
 
-def handleDeleteTheme(*gin.Context c) (
-    string userId = c.MustGet("userId").toStr()
-    string uuid = c.Query("uuid").toStr()
+def handleRateTheme(*serve.Context c) (
+    string userId = c.getString("userId")
+
+    string uuid = c.formValue("uuid")
+    string rating = c.formValue("rating")
 
     if uuid == "" (
-        c.JSON(400, {ok: false, error: "missing uuid"})
-        return
-    )
-
-    auto result = deleteTheme(uuid, userId)
-
-    if !result.ok (
-        c.JSON(500, {ok: false, error: result.error})
-        return
-    )
-
-    c.JSON(200, {ok: true})
-)
-
-def handleRateTheme(*gin.Context c) (
-    string userId = c.MustGet("userId").toStr()
-    boolean authenticated = c.MustGet("authenticated").toBool()
-
-    if !authenticated (
-        c.JSON(401, {ok: false, error: "you must be logged in to like/dislike themes"})
-        return
-    )
-
-    string uuid = c.PostForm("uuid")
-    string rating = c.PostForm("rating")
-
-    if uuid == "" (
-        c.JSON(400, {ok: false, error: "missing uuid"})
+        c.json(400, {ok: false, error: "missing uuid"})
         return
     )
 
     if rating != "like" and rating != "dislike" (
-        c.JSON(400, {ok: false, error: "invalid rating"})
+        c.json(400, {ok: false, error: "invalid rating"})
+        return
+    )
+
+    auto themeResult = getTheme(uuid)
+    if !themeResult.ok (
+        c.json(404, {ok: false, error: "theme not found"})
         return
     )
 
     boolean success = rateTheme(uuid, userId, rating)
 
     if !success (
-        c.JSON(500, {ok: false, error: "failed to rate theme"})
+        c.json(500, {ok: false, error: "failed to rate theme"})
         return
     )
 
     auto ratings = getRatings(uuid)
 
-    c.JSON(200, {ok: true, likes: ratings.likes, dislikes: ratings.dislikes})
+    c.json(200, {ok: true, likes: ratings.likes, dislikes: ratings.dislikes})
 )
 
-def handleGetRatings(*gin.Context c) (
-    string uuid = c.Query("uuid").toStr()
+def handleGetRatings(*serve.Context c) (
+    string uuid = c.query("uuid")
 
     if uuid == "" (
-        c.JSON(400, {ok: false, error: "missing uuid"})
+        c.json(400, {ok: false, error: "missing uuid"})
         return
     )
 
     auto ratings = getRatings(uuid)
 
-    c.JSON(200, {ok: true, likes: ratings.likes, dislikes: ratings.dislikes, userRatings: ratings.userRatings})
+    c.json(200, {ok: true, likes: ratings.likes, dislikes: ratings.dislikes, userRatings: ratings.userRatings})
 )
 
-def handleGetUserThemes(*gin.Context c) (
-    string username = c.Query("username")
-    string authType = c.DefaultQuery("authType", "scratch")
+def handleGetUserThemes(*serve.Context c) (
+    string username = c.query("username")
+    string authType = c.queryDefault("authType", "rotur")
 
     if username == "" (
-        c.JSON(400, {ok: false, error: "missing username"})
+        c.json(400, {ok: false, error: "missing username"})
         return
     )
 
     auto result = getUserThemes(username, authType)
 
     if !result.ok (
-        c.JSON(404, {ok: false, error: "user not found"})
+        c.json(404, {ok: false, error: "user not found"})
         return
     )
 
-    c.JSON(200, {ok: true, themes: result.themes, user: result.user})
+    c.json(200, {ok: true, themes: result.themes, user: result.user})
 )
 
-def handleDownloadAllThemes(*gin.Context c) (
-    string userId = c.MustGet("userId").toStr()
-    string authType = c.MustGet("authType").toStr()
+def handleGetLikedThemesAPI(*serve.Context c) (
+    string userId = c.getString("userId")
+    string authType = c.getString("authType")
+
+    auto result = getUserLikedThemes(userId, authType)
+
+    if !result.ok (
+        c.json(500, {ok: false, error: result.error})
+        return
+    )
+
+    c.json(200, {ok: true, themes: result.themes})
+)
+
+def handleGetDownloadCount(*serve.Context c) (
+    string uuid = c.query("uuid")
+
+    if uuid == "" (
+        c.json(400, {ok: false, error: "missing uuid"})
+        return
+    )
+
+    number count = getDownloadCount(uuid)
+    c.json(200, {ok: true, count: count})
+)
+
+def handleCheckDownloaded(*serve.Context c) (
+    string uuid = c.query("uuid")
+
+    if uuid == "" (
+        c.json(400, {ok: false, error: "missing uuid"})
+        return
+    )
+
+    string userId = c.getString("userId")
+    boolean downloaded = hasDownloaded(uuid, userId)
+    c.json(200, {ok: true, downloaded: downloaded})
+)
+
+def handleDownloadAllThemes(*serve.Context c) (
+    string userId = c.getString("userId")
+    string authType = c.getString("authType")
 
     auto userResult = getUser(userId, authType)
     if !userResult.ok (
-        c.JSON(404, {ok: false, error: "user not found"})
+        c.json(404, {ok: false, error: "user not found"})
         return
     )
 
     object user = userResult.user
     string username = user.username.toStr()
 
-    auto themesResult = getUserThemes(userId, authType)
-
-    if !themesResult.ok (
-        c.JSON(500, {ok: false, error: "failed to load user themes"})
-        return
-    )
-
-    array themeUUIDs = themesResult.themes.assert(array)
-    array themes = []
-
-    if themeUUIDs.len == 0 (
-        c.JSON(200, {ok: true, themes: [], username: username})
-        return
-    )
-
     object index = loadThemeIndex()
     object indexThemes = index.themes
+    array themeUUIDs = user.themes.assert(array)
+    array themes = []
 
     for i themeUUIDs.len (
         string uuid = themeUUIDs[i].toStr()
@@ -704,123 +573,34 @@ def handleDownloadAllThemes(*gin.Context c) (
         )
     )
 
-    c.JSON(200, {ok: true, themes: themes, username: username})
+    c.json(200, {ok: true, themes: themes, username: username})
 )
 
-def handleDeleteAllUserData(*gin.Context c) (
-    string userId = c.MustGet("userId").toStr()
-    string authType = c.MustGet("authType").toStr()
+def handleDeleteAllUserData(*serve.Context c) (
+    string userId = c.getString("userId")
+    string authType = c.getString("authType")
 
     auto userResult = getUser(userId, authType)
     if !userResult.ok (
-        c.JSON(404, {ok: false, error: "user not found"})
+        c.json(404, {ok: false, error: "user not found"})
         return
     )
 
     object user = userResult.user
-
     array themeUUIDs = user.themes.assert(array)
 
     for i themeUUIDs.len (
         string uuid = themeUUIDs[i].toStr()
-        auto themeResult = getTheme(uuid)
-        if themeResult.ok (
-            object theme = themeResult.theme
-            object themeEntry = theme.themes[1].assert(object)
-            string themeAuthor = themeEntry.author.toStr()
-            if themeAuthor == userId (
-                deleteTheme(uuid, userId)
-            )
-        )
+        deleteTheme(uuid, userId, false)
     )
 
     deleteUser(userId, authType)
 
-    c.JSON(200, {ok: true, message: "all user data deleted"})
-)
-
-def handleGetCurrentUser(*gin.Context c) (
-    auto user = getCurrentUser(c)
-
-    if !user.ok (
-        c.JSON(401, {ok: false, error: "not authenticated"})
-        return
+    string token = requestToken(c)
+    if token != "" (
+        deleteSession(token)
     )
+    clearAuthCookie(c)
 
-    c.JSON(200, {ok: true, user: user.user, authType: user.authType})
-)
-
-def handleGetDownloadCount(*gin.Context c) (
-    string uuid = c.Query("uuid").toStr()
-
-    if uuid == "" (
-        c.JSON(400, {ok: false, error: "missing uuid"})
-        return
-    )
-
-    number count = getDownloadCount(uuid)
-    c.JSON(200, {ok: true, count: count})
-)
-
-def handleCheckDownloaded(*gin.Context c) (
-    string uuid = c.Query("uuid").toStr()
-
-    if uuid == "" (
-        c.JSON(400, {ok: false, error: "missing uuid"})
-        return
-    )
-
-    boolean authenticated = c.MustGet("authenticated").toBool()
-    if !authenticated (
-        c.JSON(401, {ok: false, error: "not authenticated"})
-        return
-    )
-
-    string userId = c.MustGet("userId").toStr()
-    boolean downloaded = hasDownloaded(uuid, userId)
-    c.JSON(200, {ok: true, downloaded: downloaded})
-)
-
-def handleGetLikedThemes(*gin.Context c) (
-    object user = c.MustGet("user")
-    string authType = c.MustGet("authType").toStr()
-    string userId = c.MustGet("userId").toStr()
-    boolean authenticated = c.MustGet("authenticated").toStr() == "true"
-    
-    if !authenticated (
-        c.Redirect(302, "/auth")
-        return
-    )
-    
-    auto result = getUserLikedThemes(userId, authType)
-    
-    if !result.ok (
-        c.HTML(500, "error.html", {error: result.error})
-        return
-    )
-    
-    auto modsData = loadMods()
-    object mods = modsData.mods.assert(object)
-    
-    array authorIds = []
-    array themes = result.themes.toArray()
-    
-    for i themes.len (
-        string author = themes[i].author.toStr()
-        if !authorIds.contains(author) and author != "" (
-            authorIds.append(author)
-        )
-    )
-    
-    auto userMap = loadUsersByIds(authorIds)
-    
-    c.HTML(200, "likes.html", {
-        Themes: result.themes,
-        User: user,
-        Authenticated: authenticated,
-        UserId: userId,
-        ActivePage: "likes",
-        Mods: mods,
-        Users: userMap
-    })
+    c.json(200, {ok: true, message: "all user data deleted"})
 )

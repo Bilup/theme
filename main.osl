@@ -1,13 +1,14 @@
 import "osl/fs"
+import "osl/crypto"
+import "osl/env"
+import "osl/json"
 import "osl/requests"
+import "osl/serve"
+import "osl/url"
 
-import "encoding/json"
-import "html/template"
-import "net/http"
-import "net/url"
-import "os"
-import "strings"
-import "time"
+import "go/encoding/json"
+import "go/html/template"
+import "go/time"
 
 string themesDir = "data/themes/"
 string indexFile = themesDir ++ "theme-index.json"
@@ -15,104 +16,108 @@ string usersDir = "data/users/"
 string sessionsDir = "data/sessions/"
 string ratingsDir = "data/ratings/"
 string downloadsDir = "data/downloads/"
+string reportsDir = "data/reports/"
+string reportsFile = reportsDir ++ "reports.json"
 string modsFile = "mods.json"
 
 object themeAuthorCache = {}
 
-string appURL = "http://localhost:5609"
-
-string scratchAuthURL = "https://auth.itinerary.eu.org/auth/"
-string scratchVerifyURL = "https://auth.itinerary.eu.org/api/auth/verifyToken"
+string appURL = env.getDefault("APP_URL", "http://localhost:5609")
+string port = env.getDefault("PORT", "5609")
+array adminUsers = ["mist"]
 
 import "./storage.osl"
 import "./auth.osl"
 import "./middleware.osl"
 import "./handlers.osl"
+import "./reports.osl"
 import "./pages.osl"
 import "./utils.osl"
 import "./theme-converter.osl"
 
-import "github.com/gin-gonic/gin"
+ensureDirectories()
+rebuildIndexWithAccents()
 
-mainloop:
+*serve.Router app = serve.new()
 
-    ensureDirectories()
-    rebuildIndexWithAccents()
+app.setFuncMap({
+    "getScratchUserAvatarURL": getScratchUserAvatarURL,
+    "formatNumber": formatNumber,
+    "formatDate": formatDate,
+    "encodeURIComponent": encodeURIComponent,
+    "toJson": toJson,
+    "sub": sub,
+    "slugify": slugify,
+    "getModIconURL": getModIconURL,
+    "getPreviewURL": getPreviewURL,
+    "getPlatformName": getPlatformName,
+    "getPlatformIcon": getPlatformIcon,
+    "getModObject": getModObject,
+    "safeStyle": safeStyle,
+    "buildGradientFromColors": buildGradientFromColors,
+    "buildGradientFromAccent": buildGradientFromAccent,
+    "toLower": toLower,
+    "toUpper": toUpper,
+    "formatUsername": formatUsername,
+    "emptyStateData": emptyStateData,
+    "themeCardData": themeCardData
+})
+app.loadHTMLGlob("templates/**/*.html")
+app.static("/static", "./static")
 
-    auto r = gin.Default()
-    
-    r.Use(authMiddleware)
-    
-    r.SetFuncMap({
-        "getScratchUserAvatarURL": getScratchUserAvatarURL,
-        "formatNumber": formatNumber,
-        "formatDate": formatDate,
-        "encodeURIComponent": encodeURIComponent,
-        "toJson": toJson,
-        "sub": sub,
-        "slugify": slugify,
-        "getModIconURL": getModIconURL,
-        "getPreviewURL": getPreviewURL,
-        "getPlatformName": getPlatformName,
-        "getPlatformIcon": getPlatformIcon,
-        "getModObject": getModObject,
-        "safeStyle": safeStyle,
-        "buildGradientFromColors": buildGradientFromColors,
-        "buildGradientFromAccent": buildGradientFromAccent,
-        "toLower": toLower,
-        "toUpper": toUpper,
-        "formatUsername": formatUsername,
-        "emptyStateData": emptyStateData,
-        "themeCardData": themeCardData,
-    })
-    r.LoadHTMLGlob("templates/**/*.html")
-    r.Static("/static", "./static")
-    
-    r.GET("/", homePage)
-    r.GET("/themes", themesPage)
-    r.GET("/auth", authPage)
-    r.GET("/about", aboutPage)
-    r.GET("/logout", handleLogout)
-    
-    r.GET("/auth/scratch", handleScratchAuthRedirect)
-    r.GET("/auth/scratch/callback", handleScratchAuthCallback)
-    
-    r.GET("/theme", themeDetailPage)
-    r.GET("/themes/:username/:themename", themeDetailPageBySlug)
-    r.GET("/upload", uploadThemePage)
-    r.GET("/upload-success", uploadSuccessPage)
-    r.GET("/profile", userProfilePage)
-    r.GET("/my-themes", myThemesPage)
-    r.GET("/likes", handleGetLikedThemes)
-	r.GET("/settings", settingsPage)
-    
-    auto api = r.Group("/api")
-    api.Use(noCORS)
-    api.GET("/health", handleHealth)
-    api.GET("/user", handleGetCurrentUser)
-    api.GET("/auth", handleRoturAuth)
-    api.GET("/mods", handleGetMods)
+app.use(corsMiddleware)
+app.use(serve.maxBodySize(262144))
+app.use(authMiddleware)
 
-    api.GET("/settings/download", requireAuth, handleDownloadAllThemes)
-    api.DELETE("/settings/user-data", requireAuth, handleDeleteAllUserData)
-    api.GET("/logout", requireAuth, handleLogout)
-    
-    api.GET("/themes", handleGetThemes)
-    api.GET("/theme", handleGetTheme)
-    api.GET("/theme/download", handleDownloadTheme)
-    api.POST("/theme/detect-platform", handleDetectPlatform)
-    api.GET("/theme/export", handleExportToPlatform)
-    
-    api.POST("/theme", requireAuth, handleCreateTheme)
-    api.PUT("/theme/name", requireAuth, handleUpdateThemeName)
-    api.DELETE("/theme", requireAuth, handleDeleteTheme)
-    
-    api.GET("/ratings", handleGetRatings)
-    api.POST("/rate", requireAuth, handleRateTheme)
-    
-    api.GET("/theme/downloads", handleGetDownloadCount)
-    api.GET("/theme/check-downloaded", requireAuth, handleCheckDownloaded)
-    
-    api.GET("/user/themes", handleGetUserThemes)
-    
-    r.Run(":5609")
+app.GET("/", homePage)
+app.GET("/themes", themesPage)
+app.GET("/auth", authPage)
+app.GET("/about", aboutPage)
+app.GET("/logout", handleLogout)
+
+app.GET("/theme", themeDetailPage)
+app.GET("/themes/:username/:themename", themeDetailPageBySlug)
+app.GET("/upload", requireAuth, uploadThemePage)
+app.GET("/upload-success", requireAuth, uploadSuccessPage)
+app.GET("/profile", userProfilePage)
+app.GET("/my-themes", requireAuth, myThemesPage)
+app.GET("/likes", requireAuth, likedThemesPage)
+app.GET("/settings", requireAuth, settingsPage)
+
+*serve.Router api = app.group("/api")
+api.GET("/health", handleHealth)
+api.GET("/user", handleGetCurrentUser)
+api.GET("/auth", handleRoturAuth)
+api.POST("/auth", handleRoturAuth)
+api.GET("/mods", handleGetMods)
+api.GET("/logout", handleLogout)
+api.POST("/logout", handleLogout)
+
+api.GET("/settings/download", requireAuth, handleDownloadAllThemes)
+api.DELETE("/settings/user-data", requireAuth, handleDeleteAllUserData)
+
+api.GET("/themes", handleGetThemes)
+api.GET("/theme", handleGetTheme)
+api.GET("/theme/download", handleDownloadTheme)
+api.POST("/theme/detect-platform", handleDetectPlatform)
+api.GET("/theme/export", handleExportToPlatform)
+
+api.POST("/theme", requireAuth, handleCreateTheme)
+api.PUT("/theme/name", requireAuth, handleUpdateThemeName)
+api.DELETE("/theme", requireAuth, handleDeleteTheme)
+
+api.GET("/ratings", handleGetRatings)
+api.POST("/rate", requireAuth, handleRateTheme)
+
+api.GET("/theme/downloads", handleGetDownloadCount)
+api.GET("/theme/check-downloaded", requireAuth, handleCheckDownloaded)
+
+api.GET("/user/themes", handleGetUserThemes)
+api.GET("/user/likes", requireAuth, handleGetLikedThemesAPI)
+
+api.POST("/report", requireAuth, handleCreateReport)
+api.GET("/admin/reports", requireAdmin, handleGetReports)
+api.POST("/admin/report/resolve", requireAdmin, handleResolveReport)
+
+log "WarpTheme listening on " ++ appURL
+app.serve(":" ++ port)

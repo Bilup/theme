@@ -1,44 +1,40 @@
-def encodeBase64(string str) string (
-    return btoa(str)
+def setAuthCookie(*serve.Context c, string sessionId) (
+    c.setCookie("auth_token", sessionId, 604800, "/", "", appURL.startsWith("https://"), true)
 )
 
-def getCookie(*gin.Context c, string name) string (
-    array cookie = c.Cookie(name).toArray()
-    return cookie[1].toStr()
+def clearAuthCookie(*serve.Context c) (
+    c.clearCookie("auth_token")
 )
 
-def setAuthCookie(*gin.Context c, string sessionId, string authType) (
-    c.SetSameSite(1)
-    auto cookieValue = sessionId ++ "|" ++ authType
-    c.SetCookie("auth_token", cookieValue, 604800, "/", "", false, true)
-)
-
-def clearAuthCookie(*gin.Context c) (
-    c.SetCookie("auth_token", "", -1, "/", "", false, false)
-)
-
-def createSession(string userId, string authType) string (
+def createSession(string userId, string username) string (
     string sessionId = randomString(32)
     object session = {
         userId: userId,
-        authType: authType,
+        username: username,
+        authType: "rotur",
         createdAt: timestamp
     }
-    
+
     string path = sessionsDir ++ sessionId ++ ".json"
     writeFile(path, session)
-    
+
     return sessionId
 )
 
-def getSession(string sessionToken) object (
-    array parts = sessionToken.split("|")
-
-    if parts.len < 2 (
-        return {ok: false, error: "invalid token format"}
-    )
-
+def sessionIdFromToken(string token) string (
+    array parts = token.split("|")
     string sessionId = parts[1].toStr()
+    if !sessionId.contains(".") and !sessionId.contains("/") (
+        return sessionId
+    )
+    return ""
+)
+
+def getSession(string token) object (
+    string sessionId = sessionIdFromToken(token)
+    if sessionId == "" (
+        return {ok: false, error: "invalid token"}
+    )
 
     string path = sessionsDir ++ sessionId ++ ".json"
     auto result = readFile(path)
@@ -49,202 +45,117 @@ def getSession(string sessionToken) object (
 
     object session = result.data.assert(object)
 
+    if timestamp - session.createdAt.toNum() > 604800000 (
+        fs.remove(path)
+        return {ok: false, error: "session expired"}
+    )
+
     return {
         ok: true,
-        userId: session.userId.assert("string").toStr(),
-        authType: session.authType.assert("string").toStr()
+        userId: session.userId.toStr(),
+        authType: session.authType.toStr()
     }
 )
 
-def deleteSession(string sessionToken) boolean (
-    array parts = sessionToken.split("|")
-    if parts.len < 2 (
+def deleteSession(string token) boolean (
+    string sessionId = sessionIdFromToken(token)
+    if sessionId == "" (
         return false
     )
 
-    string sessionId = parts[1].toStr()
     string path = sessionsDir ++ sessionId ++ ".json"
-    return fs.Remove(path)
+    return fs.remove(path)
 )
 
-def parseAuthToken(string token) object (
-    if token == "" (
-        return {ok: false, error: "empty token"}
+def requestToken(*serve.Context c) string (
+    string token = c.bearer()
+    if token != "" (
+        return token
     )
-
-    array parts = token.split("|")
-    if parts.len < 2 (
-        return {ok: false, error: "invalid token format"}
-    )
-
-    return getSession(token)
+    return c.cookie("auth_token")
 )
 
-def verifyScratchToken(string privateCode, string expectedRedirect) object (
-    string url = scratchVerifyURL ++ "?privateCode=" ++ privateCode
-    object resp = requests.Get(url)
+def isAdminUser(string username) boolean (
+    return adminUsers.contains(username.toLower())
+)
+
+def handleRoturAuth(*serve.Context c) (
+    string validator = c.query("v")
+
+    if validator == "" (
+        c.json(401, {ok: false, error: "missing token"})
+        return
+    )
+
+    object resp = requests.get("https://api.rotur.dev/validate?key=warptheme&v=" ++ url.escape(validator))
 
     if !resp.success (
-        return {ok: false, error: "request failed"}
+        c.json(401, {ok: false, error: "failed to validate token"})
+        return
     )
 
-    object data = resp.body.toStr().JsonParse().assert(object)
+    auto parsed = json.parse(resp.body, {type: "object"})
+    if parsed.isErr() (
+        c.json(401, {ok: false, error: "invalid response from rotur"})
+        return
+    )
+    object data = parsed.unwrap().assert(object)
+
+    if data.contains("error") and data.error != null (
+        c.json(401, {ok: false, error: data.error})
+        return
+    )
 
     if !data.contains("valid") or data.valid == false (
-        return {ok: false, error: "invalid token"}
-    )
-
-    if data.contains("redirect") and data.redirect != expectedRedirect (
-        return {ok: false, error: "redirect mismatch"}
-    )
-
-    return {
-        ok: true,
-        username: data.username,
-        valid: true
-    }
-)
-
-def handleScratchAuthRedirect(*gin.Context c) (
-    string callbackURL = appURL ++ "/auth/scratch/callback"
-    string encoded = encodeBase64(callbackURL)
-    string redirect = scratchAuthURL ++ "?redirect=" ++ encoded ++ "&name=WarpTheme"
-    c.Redirect(302, redirect)
-)
-
-def getScratchUserId(string username) string (
-    string url = "https://scratch.mit.edu/users/" ++ username
-    object resp = requests.Get(url)
-
-    if !resp.success (
-        return ""
-    )
-
-    string html = resp.body.toStr()
-
-    array parts = html.split("/user/")
-    for i parts.len (
-        string part = parts[i].toStr()
-        int underscoreIdx = part.index("_")
-        if underscoreIdx > 0 (
-            string potentialId = part.trim(1, underscoreIdx - 1)
-            if potentialId.len > 0 and potentialId.toNum() > 0 (
-                return potentialId
-            )
-        )
-    )
-
-    return ""
-)
-
-def updateUserAvatar(string userId, string authType, string avatarUrl) boolean (
-    auto userResult = getUser(userId, authType)
-    if !userResult.ok (
-        return false
-    )
-
-    object storedUser = userResult.user.assert(object)
-    storedUser.avatar = avatarUrl
-    storedUser.username = userId
-
-    string path = usersDir ++ userId ++ ".json"
-    return writeFile(path, storedUser)
-)
-
-def handleScratchAuthCallback(*gin.Context c) (
-    string privateCode = c.Query("privateCode")
-    string expectedRedirect = appURL ++ "/auth/scratch/callback"
-
-    if privateCode == "" (
-        c.JSON(400, {ok: false, error: "missing private code"})
+        c.json(401, {ok: false, error: "invalid token"})
         return
     )
 
-    object result = verifyScratchToken(privateCode, expectedRedirect)
-    if !result.ok (
-        c.JSON(403, {ok: false, error: result.error})
-        return
-    )
+    string userId = data.id.toStr()
+    string username = data.username.toStr()
 
-    string username = result.username.toStr()
-    string userId = "@" ++ username
-
-    ensureUser(userId, "scratch", userId)
-
-    string scratchUserId = getScratchUserId(username)
-    string avatarUrl = ""
-    if scratchUserId != "" (
-        avatarUrl = "https://uploads.scratch.mit.edu/users/avatars/" ++ scratchUserId ++ ".png"
-        updateUserAvatar(userId, "scratch", avatarUrl)
-    )
-
-    string sessionId = createSession(userId, "scratch")
-    setAuthCookie(c, sessionId, "scratch")
-    c.Redirect(302, "/")
-)
-
-def handleRoturAuth(*gin.Context c) (
-    string validator = c.Query("v")
-    
-    if validator == "" (
-        c.JSON(401, {ok: false, error: "missing token"})
-        return
-    )
-    
-    object resp = requests.Get("https://api.rotur.dev/validate?key=warptheme&v=" ++ validator)
-    
-    if !resp.success (
-        c.JSON(401, {ok: false, error: "failed to validate token"})
-        return
-    )
-    
-    object json = resp.body.toStr().JsonParse()
-    
-    if json.error != null (
-        c.JSON(401, {ok: false, error: json.error})
-        return
-    )
-    
-    if !json.valid (
-        c.JSON(401, {ok: false, error: "invalid token"})
-        return
-    )
-    
-    string userId = json.id.toStr()
-    string username = json.username.toStr()
-    
     ensureUser(userId, "rotur", username)
-    
-    string sessionId = createSession(userId, "rotur")
-    
-    setAuthCookie(c, sessionId, "rotur")
-    
-    c.JSON(200, {ok: true, sessionId: sessionId, username: username})
+
+    string sessionId = createSession(userId, username)
+
+    setAuthCookie(c, sessionId)
+
+    c.json(200, {
+        ok: true,
+        token: sessionId,
+        sessionId: sessionId,
+        username: username,
+        isAdmin: isAdminUser(username)
+    })
 )
 
-def handleLogout(*gin.Context c) (
-    string token = getCookie(c, "auth_token")
+def handleLogout(*serve.Context c) (
+    string token = requestToken(c)
     if token != "" (
         deleteSession(token)
     )
     clearAuthCookie(c)
-    c.Redirect(302, "/")
+    if c.path().startsWith("/api") (
+        c.json(200, {ok: true})
+        return
+    )
+    c.redirect(302, "/")
 )
 
-def getCurrentUser(*gin.Context c) object (
-    string token = getCookie(c, "auth_token")
+def getCurrentUser(*serve.Context c) object (
+    string token = requestToken(c)
 
     if token == "" (
         return {ok: false, error: "not authenticated"}
     )
 
-    object parsed = parseAuthToken(token)
+    object parsed = getSession(token)
     if !parsed.ok (
         return {ok: false, error: "invalid token"}
     )
 
-    string userId = parsed.userId.assert("string").toStr()
-    string authType = parsed.authType.assert("string").toStr()
+    string userId = parsed.userId.toStr()
+    string authType = parsed.authType.toStr()
 
     object userResult = getUser(userId, authType)
 
@@ -257,7 +168,7 @@ def getCurrentUser(*gin.Context c) object (
     return {
         ok: true,
         user: user,
-        authType: parsed.authType,
-        userId: parsed.userId
+        authType: authType,
+        userId: userId
     }
 )

@@ -1,336 +1,231 @@
-def homePage(*gin.Context c) (
-    boolean authenticated = c.MustGet("authenticated").toStr() == "true"
-    object user = c.MustGet("user")
-
-    c.HTML(200, "home.html", {
+def homePage(*serve.Context c) (
+    c.html(200, "home.html", {
         ActivePage: "home",
-        Authenticated: authenticated,
-        User: user,
-        UserId: c.MustGet("userId")
+        Authenticated: c.getBool("authenticated"),
+        User: c.get("user"),
+        UserId: c.getString("userId")
     })
 )
 
-def themesPage(*gin.Context c) (
-    boolean authenticated = c.MustGet("authenticated").toStr() == "true"
-    object user = c.MustGet("user")
-    string sortBy = c.DefaultQuery("sort", "newest")
-    string platformFilter = c.DefaultQuery("platform", "")
-
+def themesPage(*serve.Context c) (
+    string sortBy = c.queryDefault("sort", "newest")
+    string platformFilter = c.query("platform").toLower()
     auto result = listThemes(sortBy)
-
-    auto themes = []
-    auto userMap = {}
-    auto modsData = loadMods()
-    object mods = modsData.mods.assert(object)
+    array themes = []
+    object users = {}
 
     if result.ok (
-        themes = result.themes.toArray()
-
+        themes = result.themes.assert(array)
         array authorIds = []
         for i themes.len (
             string author = themes[i].author.toStr()
-            if !authorIds.contains(author) and author != "" (
+            if author != "" and !authorIds.contains(author) (
                 authorIds.append(author)
             )
         )
-
-        userMap = loadUsersByIds(authorIds)
+        users = loadUsersByIds(authorIds)
     )
 
     if platformFilter != "" (
-        array filteredThemes = []
+        array filtered = []
         for i themes.len (
             object item = themes[i]
-            if item.platform.toStr() == platformFilter (
-                filteredThemes.append(item)
+            if item.platform.toStr().toLower() == platformFilter (
+                filtered.append(item)
             )
         )
-        themes = filteredThemes
+        themes = filtered
     )
 
-    c.HTML(200, "index.html", {
+    c.html(200, "index.html", {
         ActivePage: "themes",
         Themes: themes,
-        Users: userMap,
-        Mods: mods,
-        Authenticated: authenticated,
-        User: user,
-        UserId: c.MustGet("userId"),
+        Users: users,
+        Mods: loadMods().mods,
+        Authenticated: c.getBool("authenticated"),
+        User: c.get("user"),
+        UserId: c.getString("userId"),
         SortBy: sortBy,
         PlatformFilter: platformFilter
     })
 )
 
-def authPage(*gin.Context c) (
-    boolean authenticated = c.MustGet("authenticated").toStr() == "true"
-
-    if authenticated (
-        c.Redirect(302, "/")
+def authPage(*serve.Context c) (
+    if c.getBool("authenticated") (
+        c.redirect(302, "/")
         return
     )
-
-    c.HTML(200, "auth.html", {
-        ActivePage: "auth"
-    })
+    c.html(200, "auth.html", {ActivePage: "auth"})
 )
 
-def aboutPage(*gin.Context c) (
-    boolean authenticated = c.MustGet("authenticated").toStr() == "true"
-    object user = c.MustGet("user")
-
-    c.HTML(200, "about.html", {
+def aboutPage(*serve.Context c) (
+    c.html(200, "about.html", {
         ActivePage: "about",
-        Authenticated: authenticated,
-        User: user,
-        UserId: c.MustGet("userId")
+        Authenticated: c.getBool("authenticated"),
+        User: c.get("user"),
+        UserId: c.getString("userId")
     })
 )
 
-def themeDetailPage(*gin.Context c) (
-    string uuid = c.Query("uuid")
-
+def themeDetailPage(*serve.Context c) (
+    string uuid = c.query("uuid")
     if uuid == "" (
-        c.Redirect(302, "/")
+        c.redirect(302, "/themes")
         return
     )
-
     renderThemeDetail(c, uuid)
 )
 
-def themeDetailPageBySlug(*gin.Context c) (
-    string username = c.Param("username")
-    string themeName = c.Param("themename")
-
-    if username == "" or themeName == "" (
-        c.HTML(404, "404.html", {})
-        return
-    )
-
-    auto result = getThemeBySlug(username, themeName)
+def themeDetailPageBySlug(*serve.Context c) (
+    auto result = getThemeBySlug(c.param("username"), c.param("themename"))
     if !result.ok (
-        c.HTML(404, "404.html", {})
+        c.html(404, "404.html", {})
         return
     )
-
-    string uuid = result.uuid.toStr()
-    renderThemeDetail(c, uuid)
+    renderThemeDetail(c, result.uuid.toStr())
 )
 
-def renderThemeDetail(*gin.Context c, string uuid) (
+def renderThemeDetail(*serve.Context c, string uuid) (
     auto themeResult = getTheme(uuid)
-
     if !themeResult.ok (
-        c.HTML(404, "404.html", {})
+        c.html(404, "404.html", {})
         return
     )
 
     object theme = themeResult.theme
-
-    auto indexData = loadThemeIndex()
-    object indexThemes = indexData.themes
-    if indexThemes.contains(uuid) (
-        object indexEntry = indexThemes[uuid]
-        if indexEntry.contains("createdAt") (
-            theme.createdAt = indexEntry.createdAt
-        )
-    )
-
-    auto ratings = getRatings(uuid)
-
-    boolean authenticated = c.MustGet("authenticated").toStr() == "true"
-    object user = c.MustGet("user")
-    string userId = c.MustGet("userId").toStr()
-
+    object ratings = getRatings(uuid)
     string author = theme.author.toStr()
-    boolean isOwner = false
-    string userRating = ""
-
+    string userId = c.getString("userId")
     object authorUser = {}
-    string authorAuthType = ""
-    auto userResult = getUser(author, "scratch")
+    auto userResult = getUser(author, "rotur")
     if userResult.ok (
         authorUser = userResult.user
-        authorAuthType = "scratch"
-    ) else (
-        userResult = getUser(author, "rotur")
-        if userResult.ok (
-            authorUser = userResult.user
-            authorAuthType = "rotur"
-        )
     )
 
-    object ratingsData = ratings
-    object userRatings = ratingsData.userRatings
+    string userRating = ""
+    object userRatings = ratings.userRatings
+    if userId != "" and userRatings.contains(userId) (
+        userRating = userRatings[userId].toStr()
+    )
 
-    string platformId = theme.platform.toStr().toLower()
+    string platform = theme.platform.toStr().toLower()
+    object mods = loadMods().mods
     object modData = {}
-
-    if platformId != "" (
-        auto modsData = loadMods()
-        object mods = modsData.mods.assert(object)
-        array keys = mods.getKeys().toArray()
-        for i keys.len (
-            string key = keys[i].toStr()
-            string keyLower = key.toLower()
-            if keyLower == platformId (
-                modData = mods[key]
-                break
-            )
-        )
-    )
-
-    if authenticated (
-        if author == userId (
-            isOwner = true
-        )
-
-        if userRatings.contains(userId) (
-            userRating = userRatings[userId].toStr()
-        )
+    if mods.contains(platform) (
+        modData = mods[platform]
     )
 
     int authorThemeCount = 0
     if authorUser.contains("themes") (
-        array authorThemes = authorUser.themes.assert(array)
-        authorThemeCount = authorThemes.len
+        authorThemeCount = authorUser.themes.assert(array).len
     )
 
     string authorJoinDate = ""
     if authorUser.contains("createdAt") (
-        number createdAt = authorUser.createdAt.toNum()
-        authorJoinDate = formatDate(createdAt)
+        authorJoinDate = formatDate(authorUser.createdAt)
     )
 
-    auto allModsData = loadMods()
-    object allMods = allModsData.mods.assert(object)
-    number downloads = getDownloadCount(uuid)
-
-    c.HTML(200, "theme-detail.html", {
+    c.html(200, "theme-detail.html", {
         ActivePage: "themes",
         Theme: theme,
         ThemeUUID: uuid,
-        Ratings: ratingsData,
-        Authenticated: authenticated,
-        User: user,
-        UserId: c.MustGet("userId"),
-        IsOwner: isOwner,
+        Ratings: ratings,
+        Authenticated: c.getBool("authenticated"),
+        User: c.get("user"),
+        UserId: userId,
+        IsOwner: author == userId,
+        IsAdmin: c.getBool("isAdmin"),
         UserRating: userRating,
         AuthorUser: authorUser,
-        AuthorAuthType: authorAuthType,
+        AuthorAuthType: "rotur",
         appURL: appURL,
         ModData: modData,
-        Platform: platformId,
+        Platform: platform,
         AuthorThemeCount: authorThemeCount,
         AuthorJoinDate: authorJoinDate,
-        Mods: allMods,
-        Downloads: downloads
+        Mods: mods,
+        Downloads: getDownloadCount(uuid)
     })
 )
 
-def uploadThemePage(*gin.Context c) (
-    object user = c.MustGet("user")
-    string userId = c.MustGet("userId").toStr()
-    boolean authenticated = c.MustGet("authenticated").toStr() == "true"
-    auto modsData = loadMods()
-    object mods = modsData.mods.assert(object)
-
-    c.HTML(200, "upload.html", {
+def uploadThemePage(*serve.Context c) (
+    c.html(200, "upload.html", {
         ActivePage: "upload",
-        User: user,
-        Authenticated: authenticated,
-        UserId: userId,
-        Mods: mods
+        User: c.get("user"),
+        Authenticated: true,
+        UserId: c.getString("userId"),
+        Mods: loadMods().mods
     })
 )
 
-def userProfilePage(*gin.Context c) (
-    string userId = c.Query("userId")
-    string authType = c.DefaultQuery("authType", "scratch")
-    boolean authenticated = c.MustGet("authenticated").toStr() == "true"
-
+def userProfilePage(*serve.Context c) (
+    string userId = c.query("userId")
     if userId == "" (
-        c.Redirect(302, "/")
+        c.redirect(302, "/themes")
         return
     )
 
-    auto userResult = getUser(userId, authType)
+    auto userResult = getUser(userId, "rotur")
     if !userResult.ok (
-        c.Redirect(302, "/")
+        c.html(404, "404.html", {})
         return
     )
 
-    auto result = getUserThemes(userId, authType)
-    auto modsData = loadMods()
-    object mods = modsData.mods.assert(object)
-
-    c.HTML(200, "profile.html", {
+    auto themesResult = getUserThemes(userId, "rotur")
+    c.html(200, "profile.html", {
         ActivePage: "profile",
-        Themes: result.themes,
+        Themes: themesResult.themes,
         ProfileUser: userResult.user,
-        Authenticated: authenticated,
-        UserId: c.MustGet("userId"),
-        User: c.MustGet("user"),
-        AuthType: authType,
-        IsOwnProfile: userId == c.MustGet("userId").toStr(),
-        Mods: mods
+        Authenticated: c.getBool("authenticated"),
+        UserId: c.getString("userId"),
+        User: c.get("user"),
+        AuthType: "rotur",
+        IsOwnProfile: userId == c.getString("userId"),
+        Mods: loadMods().mods
     })
 )
 
-def myThemesPage(*gin.Context c) (
-    object user = c.MustGet("user")
-    string authType = c.MustGet("authType").toStr()
-    string userId = c.MustGet("userId").toStr()
-    boolean authenticated = c.MustGet("authenticated").toStr() == "true"
-
-    auto result = getUserThemes(userId, authType)
-    auto modsData = loadMods()
-    object mods = modsData.mods.assert(object)
-
-    c.HTML(200, "my-themes.html", {
+def myThemesPage(*serve.Context c) (
+    string userId = c.getString("userId")
+    auto result = getUserThemes(userId, "rotur")
+    c.html(200, "my-themes.html", {
         ActivePage: "my-themes",
         Themes: result.themes,
-        User: user,
-        Authenticated: authenticated,
+        User: c.get("user"),
+        Authenticated: true,
         UserId: userId,
-        Mods: mods
+        Mods: loadMods().mods
     })
 )
 
-def uploadSuccessPage(*gin.Context c) (
-    object user = c.MustGet("user")
-    string userId = c.MustGet("userId").toStr()
-    boolean authenticated = c.MustGet("authenticated").toStr() == "true"
-    string countStr = c.DefaultQuery("count", "1")
-    number count = countStr.toNum()
-    int countInt = count.toInt()
+def likedThemesPage(*serve.Context c) (
+    string userId = c.getString("userId")
+    auto result = getUserLikedThemes(userId, "rotur")
+    c.html(200, "likes.html", {
+        ActivePage: "likes",
+        Themes: result.themes,
+        User: c.get("user"),
+        Authenticated: true,
+        UserId: userId,
+        Mods: loadMods().mods
+    })
+)
 
-    c.HTML(200, "upload-success.html", {
+def uploadSuccessPage(*serve.Context c) (
+    c.html(200, "upload-success.html", {
         ActivePage: "upload",
-        User: user,
-        Authenticated: authenticated,
-        UserId: userId,
-        ThemeCount: countInt
+        User: c.get("user"),
+        Authenticated: true,
+        UserId: c.getString("userId"),
+        ThemeCount: c.queryInt("count", 1)
     })
 )
 
-def settingsPage(*gin.Context c) (
-	object user = c.MustGet("user")
-	string userId = c.MustGet("userId").toStr()
-	boolean authenticated = c.MustGet("authenticated").toStr() == "true"
-
-	c.HTML(200, "settings.html", {
-		ActivePage: "settings",
-		User: user,
-		Authenticated: authenticated,
-		UserId: userId
-	})
-)
-
-def logout(*gin.Context c) (
-    string token = getCookie(c, "auth_token")
-    if token != "" (
-        deleteSession(token)
-    )
-    clearAuthCookie(c)
-    c.Redirect(302, "/")
+def settingsPage(*serve.Context c) (
+    c.html(200, "settings.html", {
+        ActivePage: "settings",
+        User: c.get("user"),
+        Authenticated: true,
+        UserId: c.getString("userId")
+    })
 )

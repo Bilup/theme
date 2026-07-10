@@ -1,18 +1,9 @@
 def encodeURIComponent(string str) string (
-    return url.QueryEscape(str)
+    return url.escape(str)
 )
 
 def decodeURIComponent(string str) string (
-    auto result = url.QueryUnescape(str).toArray()
-    if result[2] != null (
-        return ""
-    )
-    return result[1].toStr()
-)
-
-def encodeBase64URLSafe(string str) string (
-    auto result = raw("base64.URLEncoding.EncodeToString([]byte(str))")
-    return result
+    return url.unescape(str)
 )
 
 def getScratchUserAvatarURL(string username) string (
@@ -44,24 +35,6 @@ def getModIconURL(string icon) string (
         return icon
     )
     return icon
-)
-
-def noCORS(*gin.Context c) (
-    string origin = c.GetHeader("Origin")
-    c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-    c.Header("Access-Control-Allow-Headers", "sessionId")
-    if origin != "" (
-        c.Header("Access-Control-Allow-Origin", origin)
-        c.Header("Access-Control-Allow-Credentials", "true")
-        c.Next()
-        return
-    )
-    c.Header("Access-Control-Allow-Origin", "*")
-    if c.Request.Method == "OPTIONS" (
-        c.AbortWithStatus(204)
-        return
-    )
-    c.Next()
 )
 
 def getPreviewURL(object mod, string appURL, string themeUUID) string (
@@ -168,7 +141,7 @@ def buildGradientFromColors(object colors) string (
         return "background: linear-gradient(135deg, " ++ singleColor ++ ", " ++ singleColor ++ ");"
     )
     
-    sortedColors = gradientColors.slice().sortBy("position")
+    sortedColors = gradientColors.sortBy("position")
     
     colorStrings = []
     for i sortedColors.len (
@@ -233,7 +206,7 @@ def generateThemeCardColors(object accent) array (
 
 def formatNumber(any num) string (
     raw("var n float64")
-    raw("if jn, ok := num.(json.Number); ok { n, _ = jn.Float64() } else { switch v := num.(type) { case float64: n = v; case int: n = float64(v) } }")
+    raw("if jn, ok := num.(OSLjson.Number); ok { n, _ = jn.Float64() } else { switch v := num.(type) { case float64: n = v; case int: n = float64(v) } }")
     raw("if n >= 1000000 { return fmt.Sprintf(\"%.1fM\", n/1000000) } else if n >= 1000 { return fmt.Sprintf(\"%.1fK\", n/1000) } else { return fmt.Sprintf(\"%.0f\", n) }")
 )
 
@@ -242,7 +215,7 @@ def formatDate(any dateInput) string (
     raw("switch v := dateInput.(type) {")
     raw("  case string:")
     raw("    dateStr = v")
-    raw("  case json.Number:")
+    raw("  case OSLjson.Number:")
     raw("    dateStr = v.String()")
     raw("  case float64:")
     raw("    ts := int64(v)")
@@ -267,8 +240,7 @@ def formatDate(any dateInput) string (
 )
 
 def isValidURL(string urlStr) boolean (
-    auto parsed = url.Parse(urlStr).toArray()
-    return parsed[2] == null and parsed[1].Scheme != "" and parsed[1].Host != ""
+    return url.isValid(urlStr)
 )
 
 def sanitizeHTML(string input) string (
@@ -298,7 +270,7 @@ def toJson(any data) string (
     if data == null (
         return ""
     )
-    return data.JsonStringify().toStr()
+    return json.stringify(data).toStr()
 )
 
 def sub(number a, number b) number (
@@ -350,4 +322,3 @@ def themeCardData(object theme, object mods, boolean showAuthor, boolean showAct
         Users: users
     }
 )
-

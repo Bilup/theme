@@ -93,7 +93,7 @@ def normalizeThemeToIntermediate(object themeJson, string platformId) object (
     if platformId == "mistwarp" (
         object sourceTheme = getMistwarpSourceTheme(themeJson)
         
-        if sourceTheme.contains("accent") (
+        if sourceTheme.contains("accent") and typeof(sourceTheme.accent) == "object" (
             object gradientInfo = extractGradientColors(sourceTheme.accent.assert(object))
             intermediate.colors.gradient = gradientInfo.gradient
             intermediate.colors.primary = gradientInfo.primary
@@ -188,8 +188,9 @@ def convertIntermediateToOriginal(object intermediate, string platformId) object
             menuBarAlign: "center"
         }
         
-        if intermediate.platformData.contains("mistwarp") (
-            object mistwarpData = intermediate.platformData.mistwarp
+        object platformData = intermediate.platformData.assert(object)
+        if platformData.contains("mistwarp") (
+            object mistwarpData = platformData.mistwarp
             if mistwarpData.contains("createdAt") (
                 mistwarpTheme.createdAt = mistwarpData.createdAt
             )
