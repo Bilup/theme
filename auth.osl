@@ -1,44 +1,40 @@
-def encodeBase64(string str) string (
-    return btoa(str)
+def setAuthCookie(*serve.Context c, string sessionId) (
+    c.setCookie("auth_token", sessionId, 604800, "/", "", appURL.startsWith("https://"), true)
 )
 
-def getCookie(*gin.Context c, string name) string (
-    array cookie = c.Cookie(name).toArray()
-    return cookie[1].toStr()
+def clearAuthCookie(*serve.Context c) (
+    c.clearCookie("auth_token")
 )
 
-def setAuthCookie(*gin.Context c, string sessionId, string authType) (
-    c.SetSameSite(1)
-    auto cookieValue = sessionId ++ "|" ++ authType
-    c.SetCookie("auth_token", cookieValue, 604800, "/", "", false, true)
-)
-
-def clearAuthCookie(*gin.Context c) (
-    c.SetCookie("auth_token", "", -1, "/", "", false, false)
-)
-
-def createSession(string userId, string authType) string (
+def createSession(string userId, string username) string (
     string sessionId = randomString(32)
     object session = {
         userId: userId,
-        authType: authType,
+        username: username,
+        authType: "rotur",
         createdAt: timestamp
     }
-    
+
     string path = sessionsDir ++ sessionId ++ ".json"
     writeFile(path, session)
-    
+
     return sessionId
 )
 
-def getSession(string sessionToken) object (
-    array parts = sessionToken.split("|")
-
-    if parts.len < 2 (
-        return {ok: false, error: "invalid token format"}
-    )
-
+def sessionIdFromToken(string token) string (
+    array parts = token.split("|")
     string sessionId = parts[1].toStr()
+    if !sessionId.contains(".") and !sessionId.contains("/") (
+        return sessionId
+    )
+    return ""
+)
+
+def getSession(string token) object (
+    string sessionId = sessionIdFromToken(token)
+    if sessionId == "" (
+        return {ok: false, error: "invalid token"}
+    )
 
     string path = sessionsDir ++ sessionId ++ ".json"
     auto result = readFile(path)
@@ -49,74 +45,117 @@ def getSession(string sessionToken) object (
 
     object session = result.data.assert(object)
 
+    if timestamp - session.createdAt.toNum() > 604800000 (
+        fs.remove(path)
+        return {ok: false, error: "session expired"}
+    )
+
     return {
         ok: true,
-        userId: session.userId.assert("string").toStr(),
-        authType: session.authType.assert("string").toStr()
+        userId: session.userId.toStr(),
+        authType: session.authType.toStr()
     }
 )
 
-def deleteSession(string sessionToken) boolean (
-    array parts = sessionToken.split("|")
-    if parts.len < 2 (
+def deleteSession(string token) boolean (
+    string sessionId = sessionIdFromToken(token)
+    if sessionId == "" (
         return false
     )
 
-    string sessionId = parts[1].toStr()
     string path = sessionsDir ++ sessionId ++ ".json"
-    return fs.Remove(path)
+    return fs.remove(path)
 )
 
-def parseAuthToken(string token) object (
-    if token == "" (
-        return {ok: false, error: "empty token"}
+def requestToken(*serve.Context c) string (
+    string token = c.bearer()
+    if token != "" (
+        return token
     )
-
-    array parts = token.split("|")
-    if parts.len < 2 (
-        return {ok: false, error: "invalid token format"}
-    )
-
-    return getSession(token)
+    return c.cookie("auth_token")
 )
 
-def updateUserAvatar(string userId, string authType, string avatarUrl) boolean (
-    auto userResult = getUser(userId, authType)
-    if !userResult.ok (
-        return false
-    )
-
-    object storedUser = userResult.user.assert(object)
-    storedUser.avatar = avatarUrl
-    storedUser.username = userId
-
-    string path = usersDir ++ userId ++ ".json"
-    return writeFile(path, storedUser)
+def isAdminUser(string username) boolean (
+    return adminUsers.contains(username.toLower())
 )
 
-def handleLogout(*gin.Context c) (
-    string token = getCookie(c, "auth_token")
+def handleRoturAuth(*serve.Context c) (
+    string validator = c.query("v")
+
+    if validator == "" (
+        c.json(401, {ok: false, error: "missing token"})
+        return
+    )
+
+    object resp = requests.get("https://api.rotur.dev/validate?key=warptheme&v=" ++ url.escape(validator))
+
+    if !resp.success (
+        c.json(401, {ok: false, error: "failed to validate token"})
+        return
+    )
+
+    auto parsed = json.parse(resp.body, {type: "object"})
+    if parsed.isErr() (
+        c.json(401, {ok: false, error: "invalid response from rotur"})
+        return
+    )
+    object data = parsed.unwrap().assert(object)
+
+    if data.contains("error") and data.error != null (
+        c.json(401, {ok: false, error: data.error})
+        return
+    )
+
+    if !data.contains("valid") or data.valid == false (
+        c.json(401, {ok: false, error: "invalid token"})
+        return
+    )
+
+    string userId = data.id.toStr()
+    string username = data.username.toStr()
+
+    ensureUser(userId, "rotur", username)
+
+    string sessionId = createSession(userId, username)
+
+    setAuthCookie(c, sessionId)
+
+    c.json(200, {
+        ok: true,
+        token: sessionId,
+        sessionId: sessionId,
+        username: username,
+        isAdmin: isAdminUser(username)
+    })
+)
+
+def handleLogout(*serve.Context c) (
+    string token = requestToken(c)
     if token != "" (
         deleteSession(token)
     )
     clearAuthCookie(c)
-    c.Redirect(302, "/")
+    if c.path().startsWith("/api") (
+        c.json(200, {ok: true})
+        return
+    )
+    c.redirect(302, "/")
 )
 
-def getCurrentUser(*gin.Context c) object (
-    string token = getCookie(c, "auth_token")
+def getCurrentUser(*serve.Context c) object (
+    string token = requestToken(c)
 
     if token == "" (
         return {ok: false, error: "not authenticated"}
     )
 
-    object parsed = parseAuthToken(token)
+    object parsed = getSession(token)
     if !parsed.ok (
         return {ok: false, error: "invalid token"}
     )
 
-    string userId = parsed.userId.assert("string").toStr()
-    string authType = parsed.authType.assert("string").toStr()
+    string userId = parsed.userId.toStr()
+    string authType = parsed.authType.toStr()
 
     object userResult = getUser(userId, authType)
 
@@ -129,119 +168,7 @@ def getCurrentUser(*gin.Context c) object (
     return {
         ok: true,
         user: user,
-        authType: parsed.authType,
-        userId: parsed.userId
+        authType: authType,
+        userId: userId
     }
-)
-
-// Exchange code for access token
-def getGitHubAccessToken(string code, string codeVerifier) object (
-    if GITHUB_CLIENT_ID == "" or GITHUB_CLIENT_SECRET == "" (
-        return {ok: false, error: "GitHub client credentials not configured"}
-    )
-    
-    string redirectUri = appURL ++ "/auth/github"
-    string body = "client_id=" ++ GITHUB_CLIENT_ID ++ "&client_secret=" ++ GITHUB_CLIENT_SECRET ++ "&code=" ++ code ++ "&redirect_uri=" ++ redirectUri
-    
-    // 添加code verifier（如果有）
-    if codeVerifier != "" (
-        body = body ++ "&code_verifier=" ++ codeVerifier
-    )
-    
-    object resp = requests.Post(GITHUB_TOKEN_URL, {
-        body: body,
-        "Content-Type": "application/x-www-form-urlencoded",
-        "Accept": "application/json"
-    })
-    
-    if !resp.success (
-        return {ok: false, error: "failed to get access token"}
-    )
-    
-    object data = resp.body.toStr().JsonParse().assert(object)
-    
-    if data.contains("error") (
-        return {ok: false, error: data.error.toStr()}
-    )
-    
-    return {
-        ok: true,
-        access_token: data.access_token.toStr()
-    }
-)
-
-// Get user info from GitHub API
-def getGitHubUserInfo(string accessToken) object (
-    object resp = requests.Get(GITHUB_USER_URL, {
-        "Authorization": "token " ++ accessToken,
-        "Accept": "application/vnd.github.v3+json"
-    })
-    
-    if !resp.success (
-        return {ok: false, error: "failed to get user info"}
-    )
-    
-    object userData = resp.body.toStr().JsonParse().assert(object)
-    
-    return {
-        ok: true,
-        id: userData.id.toStr(),
-        username: userData.login.toStr(),
-        name: userData.name != null ? userData.name.toStr() : userData.login.toStr(),
-        avatar: userData.avatar_url.toStr()
-    }
-)
-
-// Handle GitHub OAuth callback
-def handleGitHubAuth(*gin.Context c) (
-    string code = c.PostForm("code")
-    string codeVerifier = c.PostForm("code_verifier")
-    
-    if code == "" (
-        c.JSON(400, {ok: false, error: "missing code"})
-        return
-    )
-    
-    // Get access token
-    object tokenResult = getGitHubAccessToken(code, codeVerifier)
-    if !tokenResult.ok (
-        c.JSON(401, {ok: false, error: tokenResult.error})
-        return
-    )
-    
-    // Get user info
-    object userResult = getGitHubUserInfo(tokenResult.access_token.toStr())
-    if !userResult.ok (
-        c.JSON(401, {ok: false, error: userResult.error})
-        return
-    )
-    
-    string userId = "github:" ++ userResult.id.toStr()
-    string username = userResult.username.toStr()
-    string avatarUrl = userResult.avatar.toStr()
-    
-    // Create or update user with avatar
-    auto userData = getUser(userId, "github")
-    if userData.ok (
-        object storedUser = userData.user.assert(object)
-        storedUser.avatar = avatarUrl
-        string path = usersDir ++ userId ++ ".json"
-        writeFile(path, storedUser)
-    ) else (
-        object user = {
-            username: username,
-            authType: "github",
-            avatar: avatarUrl,
-            themes: [],
-            createdAt: timestamp
-        }
-        string path = usersDir ++ userId ++ ".json"
-        writeFile(path, user)
-    )
-    
-    // Create session
-    string sessionId = createSession(userId, "github")
-    setAuthCookie(c, sessionId, "github")
-    
-    c.JSON(200, {ok: true, sessionId: sessionId, username: username})
 )

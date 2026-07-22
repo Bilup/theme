@@ -14,8 +14,8 @@
         <div class="auth-card">
             <div class="auth-header">
                 <i data-lucide="palette" class="auth-logo"></i>
-                <h1>Welcome to Bilme</h1>
-                <p>Sign in with GitHub to continue</p>
+                <h1>Welcome to WarpTheme</h1>
+                <p>Sign in with Rotur to upload, report, and manage themes</p>
             </div>
             
             <div class="auth-providers">
@@ -28,8 +28,8 @@
                             <img src="https://github.com/favicon.ico" alt="GitHub">
                         </div>
                         <div class="auth-btn-content">
-                            <strong>GitHub</strong>
-                            <span>Sign in with your GitHub account</span>
+                            <strong>Rotur</strong>
+                            <span>Seamless auth for web services</span>
                         </div>
                         <div class="auth-btn-arrow">
                             <i data-lucide="arrow-right"></i>
@@ -39,16 +39,13 @@
             </div>
             
             <div class="auth-footer">
-                <a href="https://github.com/signup" target="_blank" class="auth-footer-link">Sign up for GitHub</a>
+                <a href="https://rotur.dev" target="_blank" class="auth-footer-link">Learn about Rotur</a>
             </div>
         </div>
     </main>
 
     {{template "footer" .}}
 
-    <script>
-        window.GITHUB_CLIENT_ID = "{{.GITHUB_CLIENT_ID}}";
-    </script>
     <script src="/static/js/auth.js"></script>
     <script>
         lucide.createIcons();

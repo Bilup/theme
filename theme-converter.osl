@@ -93,7 +93,7 @@ def normalizeThemeToIntermediate(object themeJson, string platformId) object (
     if platformId == "bilup" (
         object sourceTheme = getBilupSourceTheme(themeJson)
         
-        if sourceTheme.contains("accent") (
+        if sourceTheme.contains("accent") and typeof(sourceTheme.accent) == "object" (
             object gradientInfo = extractGradientColors(sourceTheme.accent.assert(object))
             intermediate.colors.gradient = gradientInfo.gradient
             intermediate.colors.primary = gradientInfo.primary
@@ -188,19 +188,11 @@ def convertIntermediateToOriginal(object intermediate, string platformId) object
             menuBarAlign: "center"
         }
         
-        if intermediate.platformData.contains("bilup") (
-            object bilupData = intermediate.platformData.bilup
-            if bilupData.contains("createdAt") (
-                bilme.createdAt = bilupData.createdAt
-            )
-            if bilupData.contains("gui") (
-                bilme.gui = bilupData.gui
-            )
-            if bilupData.contains("blocks") (
-                bilme.blocks = bilupData.blocks
-            )
-            if bilupData.contains("menuBarAlign") (
-                bilme.menuBarAlign = bilupData.menuBarAlign
+        object platformData = intermediate.platformData.assert(object)
+        if platformData.contains("mistwarp") (
+            object mistwarpData = platformData.mistwarp
+            if mistwarpData.contains("createdAt") (
+                bilme.createdAt = mistwarpData.createdAt
             )
         )
         

@@ -1,0 +1,153 @@
+def loadReports() array (
+    auto result = readFile(reportsFile)
+    if !result.ok (
+        return []
+    )
+    object data = result.data.assert(object)
+    return data.reports.assert(array)
+)
+
+def saveReports(array reports) boolean (
+    return writeFile(reportsFile, {reports: reports})
+)
+
+def handleCreateReport(*serve.Context c) (
+    string userId = c.getString("userId")
+    string username = c.getString("username")
+
+    object body = c.bodyJSON()
+    string uuid = body.uuid.toStr()
+    string reason = body.reason.toStr().strip()
+
+    if uuid == "" (
+        c.json(400, {ok: false, error: "missing uuid"})
+        return
+    )
+
+    if reason == "" (
+        c.json(400, {ok: false, error: "a reason is required"})
+        return
+    )
+
+    if reason.len > 500 (
+        c.json(400, {ok: false, error: "reason is too long (max 500 characters)"})
+        return
+    )
+
+    auto themeResult = getTheme(uuid)
+    if !themeResult.ok (
+        c.json(404, {ok: false, error: "theme not found"})
+        return
+    )
+
+    array reports = loadReports()
+    for i reports.len (
+        object existing = reports[i]
+        if existing.themeUuid.toStr() == uuid and existing.reporter.toStr() == userId and existing.status.toStr() == "open" (
+            c.json(400, {ok: false, error: "you already have an open report for this theme"})
+            return
+        )
+    )
+
+    object theme = themeResult.theme
+
+    object report = {
+        id: "report-" ++ randomString(16),
+        themeUuid: uuid,
+        themeName: theme.name,
+        themeAuthor: theme.author,
+        reporter: userId,
+        reporterName: username,
+        reason: reason,
+        createdAt: timestamp,
+        status: "open",
+        resolvedBy: "",
+        resolvedAt: 0,
+        action: ""
+    }
+
+    reports.append(report)
+
+    if !saveReports(reports) (
+        c.json(500, {ok: false, error: "failed to save report"})
+        return
+    )
+
+    c.json(200, {ok: true, id: report.id})
+)
+
+def handleGetReports(*serve.Context c) (
+    string status = c.queryDefault("status", "open")
+
+    array reports = loadReports()
+    array filtered = []
+
+    for i reports.len (
+        object report = reports[i]
+        if status == "all" or report.status.toStr() == status (
+            filtered.append(report)
+        )
+    )
+
+    filtered.sortBy("createdAt", "descending")
+    c.json(200, {ok: true, reports: filtered})
+)
+
+def handleResolveReport(*serve.Context c) (
+    string adminId = c.getString("userId")
+
+    object body = c.bodyJSON()
+    string reportId = body.id.toStr()
+    string action = body.action.toStr()
+
+    if reportId == "" (
+        c.json(400, {ok: false, error: "missing report id"})
+        return
+    )
+
+    if action != "dismiss" and action != "delete-theme" (
+        c.json(400, {ok: false, error: "invalid action (dismiss or delete-theme)"})
+        return
+    )
+
+    array reports = loadReports()
+    boolean found = false
+
+    for i reports.len (
+        object report = reports[i]
+        if report.id.toStr() == reportId (
+            found = true
+
+            if report.status.toStr() != "open" (
+                c.json(400, {ok: false, error: "report is already resolved"})
+                return
+            )
+
+            if action == "delete-theme" (
+                string themeUuid = report.themeUuid.toStr()
+                auto deleteResult = deleteTheme(themeUuid, adminId, true)
+                if !deleteResult.ok and deleteResult.error.toStr() != "theme not found" (
+                    c.json(500, {ok: false, error: deleteResult.error})
+                    return
+                )
+            )
+
+            report.status = "resolved"
+            report.resolvedBy = adminId
+            report.resolvedAt = timestamp
+            report.action = action
+        )
+    )
+
+    if !found (
+        c.json(404, {ok: false, error: "report not found"})
+        return
+    )
+
+    if !saveReports(reports) (
+        c.json(500, {ok: false, error: "failed to save reports"})
+        return
+    )
+
+    c.json(200, {ok: true})
+)

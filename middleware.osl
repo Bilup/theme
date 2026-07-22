@@ -1,73 +1,77 @@
-def authMiddleware(*gin.Context c) (
-    string token = getCookie(c, "auth_token")
-    string authenticated = "false"
+def corsMiddleware(*serve.Context c) (
+    c.setHeader("Access-Control-Allow-Origin", "*")
+    c.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+    c.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
+    c.setHeader("Access-Control-Max-Age", "86400")
+
+    if c.method() == "OPTIONS" (
+        c.noContent()
+        return
+    )
+
+    c.next()
+)
+
+def authMiddleware(*serve.Context c) (
+    boolean authenticated = false
     object user = {}
     string authType = ""
     string userId = ""
+    string username = ""
+    boolean isAdmin = false
 
-    if token != "" (
-        object result = getCurrentUser(c)
-        if result.ok == true (
-            authenticated = "true"
-            user = result.user
-            authType = result.authType.assert("string").toStr()
-            userId = result.userId.assert("string").toStr()
-        )
+    object result = getCurrentUser(c)
+    if result.ok == true (
+        authenticated = true
+        user = result.user
+        authType = result.authType.toStr()
+        userId = result.userId.toStr()
+        username = user.username.toStr()
+        isAdmin = isAdminUser(username)
     )
 
-    c.Set("authenticated", authenticated)
-    c.Set("user", user)
-    c.Set("authType", authType)
-    c.Set("userId", userId)
+    c.set("authenticated", authenticated)
+    c.set("user", user)
+    c.set("authType", authType)
+    c.set("userId", userId)
+    c.set("username", username)
+    c.set("isAdmin", isAdmin)
 
-    c.Next()
+    c.next()
 )
 
-def requireAuth(*gin.Context c) (
-    boolean authenticated = c.MustGet("authenticated").toBool()
+def requireAuth(*serve.Context c) (
+    boolean authenticated = c.getBool("authenticated")
 
     if !authenticated (
-        c.Redirect(302, "/auth")
-        c.Abort()
+        if c.path().startsWith("/api") (
+            c.json(401, {ok: false, error: "not authenticated"})
+            c.abort()
+            return
+        )
+        c.redirect(302, "/auth?next=" ++ url.escape(c.path()))
+        c.abort()
         return
     )
 
-    c.Next()
+    c.next()
 )
 
-def requireOwner(*gin.Context c) (
-    string uuid = c.Query("uuid")
+def requireAdmin(*serve.Context c) (
+    boolean authenticated = c.getBool("authenticated")
+    boolean isAdmin = c.getBool("isAdmin")
 
-    if uuid == "" (
-        uuid = c.Param("uuid")
-    )
-
-    if uuid == "" (
-        c.JSON(400, {ok: false, error: "missing theme uuid"})
-        c.Abort()
+    if !authenticated (
+        c.json(401, {ok: false, error: "not authenticated"})
+        c.abort()
         return
     )
 
-    auto themeResult = getTheme(uuid)
-
-    if !themeResult.ok (
-        c.JSON(404, {ok: false, error: "theme not found"})
-        c.Abort()
+    if !isAdmin (
+        c.json(403, {ok: false, error: "admin access required"})
+        c.abort()
         return
     )
 
-    object theme = themeResult.theme
-    array themesArr = theme.themes
-    object themeEntry = themesArr[1]
-
-    string author = themeEntry.author.toStr()
-    string userId = c.MustGet("userId").toStr()
-
-    if author != userId (
-        c.JSON(403, {ok: false, error: "not authorized"})
-        c.Abort()
-        return
-    )
-
-    c.Next()
+    c.next()
 )

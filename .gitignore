@@ -37,3 +37,4 @@ data/
 
 # Secret
 secrets.json
+.DS_Store
