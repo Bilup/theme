@@ -91,10 +91,10 @@ def buildExportMetadata(object themeData, object themeEntry) object (
 
     if themeEntry.contains("platformData") (
         object platformData = themeEntry.platformData.assert(object)
-        if platformData.contains("mistwarp") (
-            object mistwarpData = platformData.mistwarp
-            if mistwarpData.contains("createdAt") (
-                metadata.createdAt = mistwarpData.createdAt
+        if platformData.contains("bilup") (
+            object bilupData = platformData.bilup
+            if bilupData.contains("createdAt") (
+                metadata.createdAt = bilupData.createdAt
             )
         )
     )
@@ -148,7 +148,7 @@ def exportThemeForPlatform(string uuid, string platform) object (
             blocks: themeEntry.blocks,
             menuBarAlign: themeEntry.menuBarAlign
         }
-        auto convertResult = convertOldMistwarpToIntermediate(oldFormat)
+        auto convertResult = convertOldBilupToIntermediate(oldFormat)
         if !convertResult.ok (
             return {ok: false, status: 500, error: "failed to convert legacy theme"}
         )

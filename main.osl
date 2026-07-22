@@ -124,5 +124,5 @@ api.POST("/report", requireAuth, handleCreateReport)
 api.GET("/admin/reports", requireAdmin, handleGetReports)
 api.POST("/admin/report/resolve", requireAdmin, handleResolveReport)
 
-log "WarpTheme listening on " ++ appURL
+log "Bilme listening on " ++ appURL
 app.serve(":" ++ port)

@@ -1,14 +1,3 @@
-def checkNitrobolt(object themeJson) bool (
-    array nitroBoltKeys = ["isGradient", "name", "primaryColor", "secondaryColor", "tertiaryColor"]
-    boolean allKeysPresent = true
-    for i nitroBoltKeys.len (
-        if !themeJson.contains(nitroBoltKeys[i]) (
-            allKeysPresent = false
-        )
-    )
-    return allKeysPresent
-)
-
 def detectThemeSource(object themeJson) object (
     string detectedPlatform = ""
     
@@ -16,12 +5,6 @@ def detectThemeSource(object themeJson) object (
         string platform = themeJson.platform.toStr().toLower()
         if isSupportedMod(platform) (
             detectedPlatform = platform
-        )
-    )
-    
-    if detectedPlatform == "" (
-        if checkNitrobolt(themeJson) (
-            detectedPlatform = "nitrobolt"
         )
     )
     
@@ -126,47 +109,6 @@ def normalizeThemeToIntermediate(object themeJson, string platformId) object (
         if bilupData.contains("gui") or bilupData.contains("blocks") or bilupData.contains("menuBarAlign") (
             intermediate.platformData.bilup = bilupData
         )
-    ) else if platformId == "nitrobolt" (
-        if themeJson.contains("gradient") (
-            object gradient = themeJson.gradient
-            if gradient.contains("colors") (
-                intermediate.colors.gradient = gradient.colors
-                array colors = gradient.colors
-                if colors.len > 0 (
-                    object firstObj = colors[1]
-                    intermediate.colors.primary = prop(firstObj, "color")
-                )
-                if colors.len > 1 (
-                    object lastObj = colors[colors.len]
-                    intermediate.colors.secondary = prop(lastObj, "color")
-                )
-            )
-            if gradient.contains("direction") (
-                intermediate.colors.gradientDirection = gradient.direction.toNum()
-            )
-        )
-        
-        if themeJson.contains("primaryColor") (
-            intermediate.colors.primary = themeJson.primaryColor.toStr()
-        )
-        if themeJson.contains("secondaryColor") (
-            intermediate.colors.secondary = themeJson.secondaryColor.toStr()
-        )
-        if themeJson.contains("tertiaryColor") (
-            intermediate.colors.tertiary = themeJson.tertiaryColor.toStr()
-        )
-        
-        object nitroboltData = {}
-        if themeJson.contains("name") (
-            nitroboltData.name = themeJson.name
-        )
-        if themeJson.contains("isGradient") (
-            nitroboltData.isGradient = themeJson.isGradient
-        )
-        
-        if nitroboltData.contains("name") or nitroboltData.contains("isGradient") (
-            intermediate.platformData.nitrobolt = nitroboltData
-        )
     )
     
     return {ok: true, intermediate: intermediate}
@@ -189,10 +131,19 @@ def convertIntermediateToOriginal(object intermediate, string platformId) object
         }
         
         object platformData = intermediate.platformData.assert(object)
-        if platformData.contains("mistwarp") (
-            object mistwarpData = platformData.mistwarp
-            if mistwarpData.contains("createdAt") (
-                bilme.createdAt = mistwarpData.createdAt
+        if platformData.contains("bilup") (
+            object bilupData = platformData.bilup
+            if bilupData.contains("createdAt") (
+                bilme.createdAt = bilupData.createdAt
+            )
+            if bilupData.contains("gui") (
+                bilme.gui = bilupData.gui
+            )
+            if bilupData.contains("blocks") (
+                bilme.blocks = bilupData.blocks
+            )
+            if bilupData.contains("menuBarAlign") (
+                bilme.menuBarAlign = bilupData.menuBarAlign
             )
         )
         
@@ -205,26 +156,6 @@ def convertIntermediateToOriginal(object intermediate, string platformId) object
         )
         
         return {ok: true, theme: bilme, platform: "bilup"}
-    ) else if platformId == "nitrobolt" (
-        object nitroboltTheme = {
-            gradient: null,
-            isGradient: intermediate.colors.gradient.len > 1,
-            primaryColor: intermediate.colors.primary,
-            secondaryColor: intermediate.colors.secondary,
-            tertiaryColor: intermediate.colors.tertiary
-        }
-
-        object nitroboltData = intermediate.platformData.nitrobolt
-        nitroboltTheme.name = nitroboltData.name ?? intermediate.name ?? ("Exported Theme At " ++ timeStr)
-
-        if nitroboltTheme.isGradient (
-            nitroboltTheme.gradient = {
-                colors: intermediate.colors.gradient,
-                direction: intermediate.colors.gradientDirection
-            }
-        )
-        
-        return {ok: true, theme: nitroboltTheme, platform: "nitrobolt"}
     )
     
     return {ok: false, error: "unsupported platform for conversion"}
@@ -267,8 +198,6 @@ def exportToPlatform(object intermediate, string targetPlatformId, object metada
         bilupExport.themes = [themeObj]
         
         return {ok: true, theme: bilupExport, platform: "bilup"}
-    ) else if targetPlatformId.toLower() == "nitrobolt" (
-        return {ok: true, theme: theme, platform: "nitrobolt"}
     )
     
     return {ok: false, error: "unsupported target platform"}

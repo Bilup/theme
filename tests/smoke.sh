@@ -13,7 +13,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 cd "$ROOT"
-"$HOME/osl/osl" compile main.osl -o "$TMP/warptheme" >/dev/null
+"$HOME/osl/osl" compile main.osl -o "$TMP/bilme" >/dev/null
 cp -R templates static mods.json "$TMP/"
 mkdir -p "$TMP/data/users" "$TMP/data/sessions"
 NOW=$(($(date +%s) * 1000))
@@ -21,7 +21,7 @@ printf '%s' '{"username":"mist","authType":"rotur","themes":[],"createdAt":'"$NO
 printf '%s' '{"userId":"admin-id","username":"mist","authType":"rotur","createdAt":'"$NOW"'}' >"$TMP/data/sessions/$TOKEN.json"
 
 cd "$TMP"
-PORT=$PORT APP_URL="http://127.0.0.1:$PORT" ./warptheme >/dev/null 2>&1 &
+PORT=$PORT APP_URL="http://127.0.0.1:$PORT" ./bilme >/dev/null 2>&1 &
 PID=$!
 
 i=0
@@ -36,7 +36,7 @@ curl -fsS -H "$AUTH" "http://127.0.0.1:$PORT/api/user" | grep -q '"isAdmin":true
 curl -fsSI -X OPTIONS -H 'Origin: https://example.com' "http://127.0.0.1:$PORT/api/theme" | grep -qi 'access-control-allow-origin: \*'
 
 CREATED=$(curl -fsS -H "$AUTH" -H 'Content-Type: application/json' -X POST \
-    --data '{"themes":[{"name":"Smoke Theme","description":"test","platform":"mistwarp","themeJson":{"platform":"mistwarp","themes":[{"name":"Smoke Theme","accent":null,"gui":"light","blocks":"three","menuBarAlign":"center"}]}}]}' \
+    --data '{"themes":[{"name":"Smoke Theme","description":"test","platform":"bilup","themeJson":{"platform":"bilup","themes":[{"name":"Smoke Theme","accent":null,"gui":"light","blocks":"three","menuBarAlign":"center"}]}}]}' \
     "http://127.0.0.1:$PORT/api/theme")
 UUID=$(printf '%s' "$CREATED" | node -pe 'JSON.parse(require("fs").readFileSync(0)).uuids[0]')
 curl -fsS "http://127.0.0.1:$PORT/themes" | grep -q 'Smoke Theme'
@@ -50,4 +50,4 @@ curl -fsS -H "$AUTH" -H 'Content-Type: application/json' -X POST \
     "http://127.0.0.1:$PORT/api/admin/report/resolve" | grep -q '"ok":true'
 curl -sS "http://127.0.0.1:$PORT/api/theme?uuid=$UUID" | grep -q 'theme not found'
 
-echo "WarpTheme smoke test passed"
+echo "Bilme smoke test passed"
