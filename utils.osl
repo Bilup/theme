@@ -1,3 +1,14 @@
+def getScratchUserAvatarURL(string username) string (
+    if username == "" (
+        return ""
+    )
+    return "https://cdn.scratch.mit.edu/get_image/user/" ++ username.toLower() ++ "_90x90.png"
+)
+
+def renderHTML(string html) any (
+    return raw("template.HTML(html)")
+)
+
 def encodeURIComponent(string str) string (
     return url.escape(str)
 )

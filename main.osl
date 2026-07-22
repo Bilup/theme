@@ -7,7 +7,6 @@ import "osl/serve"
 import "osl/url"
 
 import "go/encoding/json"
-import "go/html/template"
 import "go/time"
 
 string themesDir = "data/themes/"
@@ -48,6 +47,7 @@ def applyMiddleWare(*serve.router r) (
 
 app.setFuncMap({
     "getScratchUserAvatarURL": getScratchUserAvatarURL,
+    "renderHTML": renderHTML,
     "formatNumber": formatNumber,
     "formatDate": formatDate,
     "encodeURIComponent": encodeURIComponent,
