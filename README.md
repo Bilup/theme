@@ -17,7 +17,7 @@ Configuration:
 ## API
 
 Every `/api` route supports cross-origin requests. Public browsing and export
-routes need no credentials. Mutating routes accept a Bilme session as
+routes need no credentials. Mutating routes accept a BilupTheme session as
 `Authorization: Bearer <token>`.
 
 Exchange a Rotur validator at `POST /api/auth?v=...` to receive that token.

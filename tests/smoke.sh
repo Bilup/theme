@@ -13,7 +13,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 cd "$ROOT"
-"$HOME/osl/osl" compile main.osl -o "$TMP/bilme" >/dev/null
+"$HOME/osl/osl" compile main.osl -o "$TMP/BilupTheme" >/dev/null
 cp -R templates static mods.json "$TMP/"
 mkdir -p "$TMP/data/users" "$TMP/data/sessions"
 NOW=$(($(date +%s) * 1000))
@@ -21,7 +21,7 @@ printf '%s' '{"username":"mist","authType":"rotur","themes":[],"createdAt":'"$NO
 printf '%s' '{"userId":"admin-id","username":"mist","authType":"rotur","createdAt":'"$NOW"'}' >"$TMP/data/sessions/$TOKEN.json"
 
 cd "$TMP"
-PORT=$PORT APP_URL="http://127.0.0.1:$PORT" ./bilme >/dev/null 2>&1 &
+PORT=$PORT APP_URL="http://127.0.0.1:$PORT" ./BilupTheme >/dev/null 2>&1 &
 PID=$!
 
 i=0
@@ -50,4 +50,4 @@ curl -fsS -H "$AUTH" -H 'Content-Type: application/json' -X POST \
     "http://127.0.0.1:$PORT/api/admin/report/resolve" | grep -q '"ok":true'
 curl -sS "http://127.0.0.1:$PORT/api/theme?uuid=$UUID" | grep -q 'theme not found'
 
-echo "Bilme smoke test passed"
+echo "BilupTheme smoke test passed"

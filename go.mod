@@ -1,4 +1,4 @@
-module bilme
+module BilupTheme
 
 go 1.25.0
 

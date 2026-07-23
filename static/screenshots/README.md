@@ -9,7 +9,7 @@ Place screenshots of supported mods here to display them on the home page.
 
 ## Guidelines
 
-- Screenshots should showcase themes using Bilme
+- Screenshots should showcase themes using BilupTheme
 - Show the full interface or meaningful sections
 - Use high-quality, clear images
 - PNG or JPG format recommended

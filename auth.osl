@@ -87,7 +87,7 @@ def handleRoturAuth(*serve.Context c) (
         return
     )
 
-    object resp = requests.get("https://api.rotur.dev/validate?key=bilme&v=" ++ url.escape(validator))
+    object resp = requests.get("https://api.rotur.dev/validate?key=BilupTheme&v=" ++ url.escape(validator))
 
     if !resp.success (
         c.json(401, {ok: false, error: "failed to validate token"})
