@@ -1,17 +1,10 @@
 {
     "mods": {
-        "mistwarp": {
-            "id": "mistwarp",
-            "name": "MistWarp",
-            "icon": "https://github.com/MistWarp.png",
-            "previewUrl": "https://warp.mistium.com?theme={DOWNLOAD_URL}",
-            "previewUrlType": "download_url"
-        },
-        "nitrobolt": {
-            "id": "nitrobolt",
-            "name": "NitroBolt",
-            "icon": "https://github.com/Nitro-Bolt.png",
-            "previewUrl": "https://nitrobolt.org?theme={DOWNLOAD_URL}",
+        "bilup": {
+            "id": "bilup",
+            "name": "Bilup",
+            "icon": "https://github.com/Bilup.png",
+            "previewUrl": "https://editor.bilup.org?theme={DOWNLOAD_URL}",
             "previewUrlType": "download_url"
         }
     }
