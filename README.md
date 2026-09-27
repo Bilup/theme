@@ -1,5 +1,8 @@
 # Bilme
 
+> [!WARNING]
+> This repository is archived due to theme.bilup.org is now down. Sorry for the inconvenice.
+
 Theme sharing for Bilup and compatible Scratch mods, powered by the latest
 [OSL](https://osl.mistium.com).
 
